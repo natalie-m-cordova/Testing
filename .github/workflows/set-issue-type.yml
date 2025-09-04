@@ -32,7 +32,7 @@ jobs:
         id: owner
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.ORG_GITHUB_TOKEN }}
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
           result-encoding: string
           script: |
             const { owner, repo } = context.repo;
