@@ -1,5 +1,5 @@
 # -------- Global fallback (last match wins) --------
-*                                  @natalie.m.cordova/core-team @NMRCDova
+*                                  @natalie-m-cordova/core-team @NMRCDova
 
 # -------- Source code & tests --------
 /src/                              @natalie-m-cordova/dev-team
