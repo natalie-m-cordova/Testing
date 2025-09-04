@@ -1,0 +1,56 @@
+name: "Documentation Issue 📚"
+description: "Report an issue or suggest improvements for documentation"
+title: "[DOCS] <short description>"
+labels: ["documentation"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue with the documentation! Please provide details below so we can improve it.
+
+  - type: input
+    id: location
+    attributes:
+      label: "Documentation Location"
+      description: "Where is the issue? (File path, URL, or section)"
+      placeholder: "Ex: README.md > Installation section"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Issue Description"
+      description: "What is wrong or missing in the documentation?"
+      placeholder: "Ex: The install steps reference a deprecated command."
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: "Suggested Fix or Improvement"
+      description: "How could we make the documentation better?"
+      placeholder: "Ex: Update the command to use the new CLI flag `--init`"
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: "Impact"
+      description: "How does this issue affect users or developers?"
+      placeholder: "Ex: New users may not be able to install the project correctly."
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Additional Context"
+      description: "Anything else we should know? Screenshots, links, etc."
+      placeholder: "Drag and drop files here"
+    validations:
+      required: false
