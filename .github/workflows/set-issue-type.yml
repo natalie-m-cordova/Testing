@@ -24,23 +24,45 @@ jobs:
           echo "TYPE_NAME=$TYPE_NAME" >> $GITHUB_OUTPUT
           echo "Mapped TYPE_NAME=$TYPE_NAME"
 
-      - name: Skip if no mapped type
+      - name: Stop if no mapped type
         if: steps.map.outputs.TYPE_NAME == ''
         run: echo "No matching label for Issue Type. Skipping."
 
-      - name: Look up Issue Type ID (GraphQL)
-        if: steps.map.outputs.TYPE_NAME != ''
+      - name: Inspect owner type (User vs Organization)
+        id: owner
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const { owner, repo } = context.repo;
+            const q = `
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) {
+                  owner { __typename login }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo });
+            return d.repository.owner.__typename; // "User" or "Organization"
+
+      - name: Stop if repo is user-owned (Issue Types are org-only)
+        if: steps.owner.outputs.result == 'User'
+        run: |
+          echo "Repository owner is a User. Issue Types are org-only. Skipping."
+          exit 0
+
+      - name: Look up Issue Type ID (GraphQL via PAT)
+        if: steps.map.outputs.TYPE_NAME != '' && steps.owner.outputs.result == 'Organization'
         id: lookup
         uses: actions/github-script@v7
         env:
           TYPE_NAME: ${{ steps.map.outputs.TYPE_NAME }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}   # <-- your PAT secret
           result-encoding: string
           script: |
             const typeName = process.env.TYPE_NAME;
-            const owner = context.repo.owner;
-            const repo  = context.repo.repo;
+            const { owner, repo } = context.repo;
 
             const q = `
               query($owner:String!, $repo:String!) {
@@ -50,10 +72,7 @@ jobs:
                     __typename
                     ... on Organization {
                       id
-                      login
-                      issueTypes(first:50) {
-                        nodes { id, name }
-                      }
+                      issueTypes(first:100) { nodes { id, name } }
                     }
                   }
                 }
@@ -62,31 +81,23 @@ jobs:
 
             const org = data.repository.owner;
             if (!org || org.__typename !== "Organization" || !org.issueTypes) {
-              throw new Error("Issue Types are not enabled for this organization.");
+              throw new Error("Issue Types not enabled or not accessible for this organization (check PAT scopes + SSO).");
             }
-
-            const match = org.issueTypes.nodes.find(
-              t => t.name.toLowerCase() === typeName.toLowerCase()
-            );
-            if (!match) {
-              throw new Error(`No Issue Type named "${typeName}" found. Create it in org settings, or adjust your mapping.`);
-            }
-
+            const match = org.issueTypes.nodes.find(t => t.name.toLowerCase() === typeName.toLowerCase());
+            if (!match) throw new Error(`Issue Type "${typeName}" not found. Create it in org settings or adjust mapping.`);
             console.log(`Resolved Issue Type "${typeName}" -> ${match.id}`);
-            // Returned value becomes steps.lookup.outputs.result
             return match.id;
 
-      - name: Set Issue Type (GraphQL)
-        if: steps.map.outputs.TYPE_NAME != ''
+      - name: Set Issue Type (GraphQL via PAT)
+        if: steps.map.outputs.TYPE_NAME != '' && steps.owner.outputs.result == 'Organization'
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TYPE_ID: ${{ steps.lookup.outputs.result }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}   # <-- your PAT secret
           script: |
-            const owner  = context.repo.owner;
-            const repo   = context.repo.repo;
+            const { owner, repo } = context.repo;
             const number = parseInt(process.env.ISSUE_NUMBER, 10);
             const issueTypeId = process.env.ISSUE_TYPE_ID;
 
@@ -106,4 +117,4 @@ jobs:
                 }
               }`;
             await github.graphql(mut, { issueId, issueTypeId });
-            console.log(`Issue #${number}: type updated.`);
+            console.log(`Issue #${number}: type updated.`)
