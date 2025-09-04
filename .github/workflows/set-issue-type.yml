@@ -1,0 +1,108 @@
+name: Set issue Type from labels
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  set-type:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Map label -> type name
+        id: map
+        run: |
+          labels_json='${{ toJson(github.event.issue.labels.*.name) }}'
+          # Default empty
+          TYPE_NAME=""
+          if echo "$labels_json" | grep -qi '"bug"'; then TYPE_NAME="Bug"; fi
+          if echo "$labels_json" | grep -qi '"enhancement"'; then TYPE_NAME="Enhancement"; fi
+          if echo "$labels_json" | grep -qi '"documentation"'; then TYPE_NAME="Documentation"; fi
+          if echo "$labels_json" | grep -qi '"duplicate"'; then TYPE_NAME="Duplicate"; fi
+          if echo "$labels_json" | grep -qi '"epic"'; then TYPE_NAME="Epic"; fi
+          echo "TYPE_NAME=$TYPE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Skip if no mapped type
+        if: steps.map.outputs.TYPE_NAME == ''
+        run: echo "No matching label for Issue Type. Skipping."
+
+      - name: Look up Issue Type ID (GraphQL)
+        if: steps.map.outputs.TYPE_NAME != ''
+        id: lookup
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const typeName = process.env.TYPE_NAME;
+            const owner = context.repo.owner;     // org/repo owner
+            const repo  = context.repo.repo;
+
+            // 1) Find repo ID and org ID
+            const repoQuery = `
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) {
+                  id
+                  owner {
+                    __typename
+                    ... on Organization {
+                      id
+                      login
+                      issueTypes(first:50) {
+                        nodes { id, name }
+                      }
+                    }
+                  }
+                }
+              }`;
+            const repoData = await github.graphql(repoQuery, { owner, repo });
+
+            const org = repoData.repository.owner;
+            if (!org || !org.issueTypes) {
+              core.setFailed("Issue Types are not enabled for this organization.");
+              return;
+            }
+
+            const match = org.issueTypes.nodes.find(t => t.name.toLowerCase() === typeName.toLowerCase());
+            if (!match) {
+              core.setFailed(`No Issue Type named "${typeName}" found. Create it in org settings.`);
+              return;
+            }
+
+            core.exportVariable("ISSUE_TYPE_ID", match.id);
+            core.exportVariable("REPO_ID", repoData.repository.id);
+
+      - name: Set Issue Type (GraphQL)
+        if: steps.map.outputs.TYPE_NAME != ''
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueTypeId = process.env.ISSUE_TYPE_ID;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const number = parseInt(process.env.ISSUE_NUMBER, 10);
+
+            // 2) Fetch the issue node ID
+            const issueQuery = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  issue(number:$number) { id }
+                }
+              }`;
+            const issueData = await github.graphql(issueQuery, { owner, repo, number });
+            const issueId = issueData.repository.issue.id;
+
+            // 3) Update the issue type
+            const mutation = `
+              mutation($issueId:ID!, $issueTypeId:ID!) {
+                updateIssue(input: {id:$issueId, issueTypeId:$issueTypeId}) {
+                  issue { id }
+                }
+              }`;
+            await github.graphql(mutation, { issueId, issueTypeId });
+
+            core.notice(`Issue type set based on labels.`);
