@@ -1,6 +1,6 @@
 name: "EPIC 🗺️"
 description: "Use this to define a high-level initiative with linked child issues"
-title: "EPIC: <short name>"
+title: "[EPIC] <short name>"
 labels: ["epic"]
 assignees: []
 
