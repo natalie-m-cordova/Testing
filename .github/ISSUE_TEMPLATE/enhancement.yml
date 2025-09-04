@@ -1,0 +1,65 @@
+name: "Enhancement ✨"
+description: "Suggest an improvement to an existing feature or functionality"
+title: "[ENHANCEMENT] <short description>"
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an enhancement! Please provide details below.
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Enhancement Summary"
+      description: "A short description of the enhancement"
+      placeholder: "Ex: Add dark mode option for the dashboard"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "What Problem Does This Solve?"
+      description: "Explain the current limitation or issue"
+      placeholder: "Ex: The dashboard is hard to use in low-light environments."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Proposed Enhancement"
+      description: "Describe your improvement idea"
+      placeholder: "Ex: Add a toggle for dark mode in user settings"
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: "Benefits"
+      description: "Who benefits and how?"
+      placeholder: "Ex: Developers can work comfortably at night, reduces eye strain"
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternative Approaches Considered"
+      description: "List any alternatives or workarounds you’ve considered"
+      placeholder: "Ex: Using a browser extension for dark mode"
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Additional Context"
+      description: "Anything else you want to add? Screenshots, mockups, references, etc."
+      placeholder: "Drag and drop files here"
+    validations:
+      required: false
