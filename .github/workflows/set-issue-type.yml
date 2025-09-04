@@ -15,14 +15,14 @@ jobs:
         id: map
         run: |
           labels_json='${{ toJson(github.event.issue.labels.*.name) }}'
-          # Default empty
           TYPE_NAME=""
-          if echo "$labels_json" | grep -qi '"bug"'; then TYPE_NAME="Bug"; fi
-          if echo "$labels_json" | grep -qi '"enhancement"'; then TYPE_NAME="Enhancement"; fi
-          if echo "$labels_json" | grep -qi '"documentation"'; then TYPE_NAME="Documentation"; fi
-          if echo "$labels_json" | grep -qi '"duplicate"'; then TYPE_NAME="Duplicate"; fi
-          if echo "$labels_json" | grep -qi '"epic"'; then TYPE_NAME="Epic"; fi
+          if echo "$labels_json" | grep -qi '"bug"';          then TYPE_NAME="Bug";          fi
+          if echo "$labels_json" | grep -qi '"enhancement"';  then TYPE_NAME="Enhancement";  fi
+          if echo "$labels_json" | grep -qi '"documentation"';then TYPE_NAME="Documentation";fi
+          if echo "$labels_json" | grep -qi '"duplicate"';    then TYPE_NAME="Duplicate";    fi
+          if echo "$labels_json" | grep -qi '"epic"';          then TYPE_NAME="Epic";         fi
           echo "TYPE_NAME=$TYPE_NAME" >> $GITHUB_OUTPUT
+          echo "Mapped TYPE_NAME=$TYPE_NAME"
 
       - name: Skip if no mapped type
         if: steps.map.outputs.TYPE_NAME == ''
@@ -32,14 +32,17 @@ jobs:
         if: steps.map.outputs.TYPE_NAME != ''
         id: lookup
         uses: actions/github-script@v7
+        env:
+          TYPE_NAME: ${{ steps.map.outputs.TYPE_NAME }}   # <-- pass it as env
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const core  = require('@actions/core');
             const typeName = process.env.TYPE_NAME;
-            const owner = context.repo.owner;     // org/repo owner
+            const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
-            // 1) Find repo ID and org ID
+            // 1) Find repo + org issue types
             const repoQuery = `
               query($owner:String!, $repo:String!) {
                 repository(owner:$owner, name:$repo) {
@@ -64,23 +67,28 @@ jobs:
               return;
             }
 
-            const match = org.issueTypes.nodes.find(t => t.name.toLowerCase() === typeName.toLowerCase());
+            const match = org.issueTypes.nodes.find(
+              t => t.name.toLowerCase() === typeName.toLowerCase()
+            );
             if (!match) {
-              core.setFailed(`No Issue Type named "${typeName}" found. Create it in org settings.`);
+              core.setFailed(`No Issue Type named "${typeName}" found. Create it in org settings, or adjust your mapping.`);
               return;
             }
 
             core.exportVariable("ISSUE_TYPE_ID", match.id);
             core.exportVariable("REPO_ID", repoData.repository.id);
+            core.notice(`Resolved Issue Type "${typeName}" -> ${match.id}`);
 
       - name: Set Issue Type (GraphQL)
         if: steps.map.outputs.TYPE_NAME != ''
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TYPE_ID: ${{ env.ISSUE_TYPE_ID }}           # inherited from previous step's export
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const core  = require('@actions/core');
             const issueTypeId = process.env.ISSUE_TYPE_ID;
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
@@ -104,5 +112,4 @@ jobs:
                 }
               }`;
             await github.graphql(mutation, { issueId, issueTypeId });
-
-            core.notice(`Issue type set based on labels.`);
+            core.notice(`Issue #${number}: type updated.`)
