@@ -1,0 +1,27 @@
+# -------- Global fallback (last match wins) --------
+*                                  @natalie.m.cordova/core-team @NMRCDova
+
+# -------- Source code & tests --------
+/src/                              @natalie.m.cordova/dev-team
+/scripts/                          @natalie.m.cordova/dev-team
+/tests/                            @natalie.m.cordova/dev-team
+
+# -------- Infrastructure / CI --------
+/.github/workflows/                @natalie.m.cordova/infra-team
+Dockerfile                         @natalie.m.cordova/infra-team
+docker-compose.yml                 @natalie.m.cordova/infra-team
+/.github/dependabot.yml            @natalie.m.cordova/infra-team
+/.github/CODEOWNERS                @natalie.m.cordova/core-team
+
+# -------- Documentation (general) --------
+/docs/                             @natalie.m.cordova/docs-team
+*.md                               @natalie.m.cordova/docs-team
+/.github/ISSUE_TEMPLATE/           @natalie.m.cordova/docs-team
+/.github/PULL_REQUEST_TEMPLATE.md  @natalie.m.cordova/docs-team
+
+# -------- Policy & sensitive docs (override general) --------
+/SECURITY.md                       @natalie.m.cordova/security-team @natalie.m.cordova/core-team
+/CODE_OF_CONDUCT.md                @natalie.m.cordova/docs-team @natalie.m.cordova/core-team
+/CONTRIBUTING.md                   @natalie.m.cordova/docs-team
+/LICENSE.md                        @natalie.m.cordova/docs-team
+/README.md                         @natalie.m.cordova/docs-team
