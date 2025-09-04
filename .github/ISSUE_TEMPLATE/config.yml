@@ -1,0 +1,13 @@
+blank_issues_enabled: false   # disables "Open a blank issue"
+
+contact_links:
+  - name: 💬 Start a Discussion
+    url: https://github.com/<your-username>/Testing/discussions
+    about: Please use Discussions for open-ended ideas or questions.
+
+issue_template_order:
+  - epic.yml
+  - bug_report.yml
+  - documentation.yml
+  - duplicate.yml
+  - enhancement.yml
