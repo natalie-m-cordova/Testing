@@ -1,0 +1,47 @@
+name: "Duplicate Issue 🔁"
+description: "Report that an issue is a duplicate of an existing one"
+title: "[DUPLICATE] <short description>"
+labels: ["duplicate"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping tidy up the tracker! Please link the original issue and add any context.
+
+  - type: input
+    id: original
+    attributes:
+      label: "Original Issue Link/Number"
+      description: "Paste the URL or the issue number (e.g., #123)"
+      placeholder: "https://github.com/<owner>/<repo>/issues/123 or #123"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: "Search Confirmation"
+      description: "Confirm you've searched for existing issues"
+      options:
+        - label: "I searched open and closed issues and this appears to be a duplicate."
+          required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Why is this a duplicate?"
+      description: "Briefly explain how it matches the original"
+      placeholder: "Same error message, same reproduction steps, same environment, etc."
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Additional Context (optional)"
+      description: "Anything else maintainers should know"
+      placeholder: "Screenshots, logs, or notes"
+    validations:
+      required: false
