@@ -1,7 +1,7 @@
-name: "🐞 Bug Report"
+name: "Bug Report 🐞"
 description: "Report a bug to help us improve"
 title: "[BUG] <short description>"
-labels: [bug]
+labels: ["bug"]
 assignees: []
 
 body:
@@ -13,17 +13,17 @@ body:
   - type: input
     id: summary
     attributes:
-      label: Bug Summary
-      description: A clear, concise description of the bug
-      placeholder: Ex: App crashes when clicking save
+      label: "Bug Summary"
+      description: "A clear, concise description of the bug"
+      placeholder: "Ex: App crashes when clicking save"
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: Steps to Reproduce
-      description: How do we reproduce the problem?
+      label: "Steps to Reproduce"
+      description: "How do we reproduce the problem?"
       placeholder: |
         1. Go to '...'
         2. Click on '...'
@@ -35,35 +35,35 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: Expected Behavior
-      description: What should have happened instead?
-      placeholder: Ex: The app should save without crashing
+      label: "Expected Behavior"
+      description: "What should have happened instead?"
+      placeholder: "Ex: The app should save without crashing"
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: Actual Behavior
-      description: What actually happened?
-      placeholder: Ex: The app crashed with error code 500
+      label: "Actual Behavior"
+      description: "What actually happened?"
+      placeholder: "Ex: The app crashed with error code 500"
     validations:
       required: true
 
   - type: input
     id: version
     attributes:
-      label: Version / Environment
-      description: What version of the software or environment are you using?
-      placeholder: v1.2.3 on Windows 10
+      label: "Version / Environment"
+      description: "What version of the software or environment are you using?"
+      placeholder: "v1.2.3 on Windows 10"
     validations:
       required: false
 
   - type: textarea
     id: logs
     attributes:
-      label: Logs / Screenshots
-      description: If applicable, add logs or screenshots
-      placeholder: Drag and drop files here
+      label: "Logs / Screenshots"
+      description: "If applicable, add logs or screenshots"
+      placeholder: "Drag and drop files here"
     validations:
       required: false
