@@ -1,0 +1,70 @@
+name: Auto-assign issues + notify teams
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+
+permissions:
+  issues: write
+
+env:
+  DEFAULT_ASSIGNEE: NMRCDova              
+  ORG_SLUG: natalie-m-cordova             
+  DEV_TEAM: dev-team
+  DOCS_TEAM: docs-team
+  SECURITY_TEAM: security-team
+  CORE_TEAM: core-team                  # could handle epics
+  TRIAGE_TEAM: core-team                # duplicates can also route here
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    steps:
+      # 1) Always assign a default owner as a fallback
+      - name: Assign default owner
+        uses: actions-ecosystem/action-add-assignees@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          assignees: ${{ env.DEFAULT_ASSIGNEE }}
+
+      # 2) Notify the right TEAM via comment based on labels
+      - name: Notify Teams
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          edit-mode: replace
+          body: |
+            <!-- auto-team-notify -->
+
+            ${{ contains(toJson(github.event.issue.labels.*.name), 'bug') &&
+                format('Routing this **bug** to @{0}/{1}.', env.ORG_SLUG, env.DEV_TEAM) || '' }}
+
+            ${{ contains(toJson(github.event.issue.labels.*.name), 'documentation') &&
+                format('Routing this **documentation** issue to @{0}/{1}.', env.ORG_SLUG, env.DOCS_TEAM) || '' }}
+
+            ${{ contains(toJson(github.event.issue.labels.*.name), 'enhancement') &&
+                format('Routing this **enhancement** to @{0}/{1}.', env.ORG_SLUG, env.DEV_TEAM) || '' }}
+
+            ${{ contains(toJson(github.event.issue.labels.*.name), 'epic') &&
+                format('Tracking this **epic** under @{0}/{1}.', env.ORG_SLUG, env.CORE_TEAM) || '' }}
+
+            ${{ contains(toJson(github.event.issue.labels.*.name), 'duplicate') &&
+                format('Marking as a **duplicate** — notifying @{0}/{1} for triage.', env.ORG_SLUG, env.TRIAGE_TEAM) || '' }}
+
+      # 3) Nudge if no recognized label
+      - name: Nudge to label
+        if: ${{ !contains(toJson(github.event.issue.labels.*.name), 'bug')
+            && !contains(toJson(github.event.issue.labels.*.name), 'documentation')
+            && !contains(toJson(github.event.issue.labels.*.name), 'enhancement')
+            && !contains(toJson(github.event.issue.labels.*.name), 'epic')
+            && !contains(toJson(github.event.issue.labels.*.name), 'duplicate') }}
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          edit-mode: replace
+          body: |
+            <!-- auto-team-notify -->
+            This issue has no routing label yet.  
+            Please add one of: `bug`, `documentation`, `enhancement`, `epic`, or `duplicate`.
