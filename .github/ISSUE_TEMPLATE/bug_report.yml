@@ -1,27 +1,69 @@
-<!-- filepath: d:\Users\Natalie\Documents\Work\Coding Projects\.github\ISSUE_TEMPLATE\bug_report.md -->
----
-name: Bug Report
-about: Create a report to help us improve
-title: "[BUG] "
-labels: bug
-assignees: ''
----
+name: "🐞 Bug Report"
+description: "Report a bug to help us improve"
+title: "[BUG] <short description>"
+labels: [bug]
+assignees: []
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please complete the details below.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '...'
-3. Scroll down to '...'
-4. See error
+  - type: input
+    id: summary
+    attributes:
+      label: Bug Summary
+      description: A clear, concise description of the bug
+      placeholder: Ex: App crashes when clicking save
+    validations:
+      required: true
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How do we reproduce the problem?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened instead?
+      placeholder: Ex: The app should save without crashing
+    validations:
+      required: true
 
-**Additional context**
-Add any other context about the problem here.
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Ex: The app crashed with error code 500
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / Environment
+      description: What version of the software or environment are you using?
+      placeholder: v1.2.3 on Windows 10
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: If applicable, add logs or screenshots
+      placeholder: Drag and drop files here
+    validations:
+      required: false
