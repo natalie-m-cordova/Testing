@@ -33,15 +33,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
-        script: |
-          const { owner, repo } = context.repo;
-          // Try REST first (clearer errors if the token can't access the repo)
-          try {
-            const r = await github.request('GET /repos/{owner}/{repo}', { owner, repo });
-            console.log(`Repo OK: ${r.data.full_name} (private=${r.data.private})`);
-          } catch (e) {
-            throw new Error(`PAT cannot access ${owner}/${repo}. Likely not selected in the PAT's repo access, or SSO not authorized.\n${e.message}`);
-          }
+          script: |
+            const { owner, repo } = context.repo;
+            // Try REST first (clearer errors if the token can't access the repo)
+            try {
+              const r = await github.request('GET /repos/{owner}/{repo}', { owner, repo });
+              console.log(`Repo OK: ${r.data.full_name} (private=${r.data.private})`);
+            } catch (e) {
+              throw new Error(`PAT cannot access ${owner}/${repo}. Likely not selected in the PAT's repo access, or SSO not authorized.\n${e.message}`);
+            }
 
       - name: Inspect owner type (User vs Organization)
         id: owner
@@ -71,25 +71,25 @@ jobs:
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
-        script: |
-          const { owner, repo } = context.repo;
-          const q = `
-            query($owner:String!, $repo:String!) {
-              repository(owner:$owner, name:$repo) {
-                owner {
-                  __typename
-                  ... on Organization {
-                    issueTypes(first:100) { nodes { id name } }
+          script: |
+            const { owner, repo } = context.repo;
+            const q = `
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) {
+                  owner {
+                    __typename
+                    ... on Organization {
+                      issueTypes(first:100) { nodes { id name } }
+                    }
                   }
                 }
-              }
-            }`;
-          const d = await github.graphql(q, { owner, repo });
-          if (d.repository.owner.__typename !== 'Organization') {
-            throw new Error('Owner is not an Organization.');
-          }
-          const types = d.repository.owner.issueTypes?.nodes || [];
-          console.log('Issue Types found:', types.map(t => `${t.name} (${t.id})`).join(', ') || 'NONE');
+              }`;
+            const d = await github.graphql(q, { owner, repo });
+            if (d.repository.owner.__typename !== 'Organization') {
+              throw new Error('Owner is not an Organization.');
+            }
+            const types = d.repository.owner.issueTypes?.nodes || [];
+            console.log('Issue Types found:', types.map(t => `${t.name} (${t.id})`).join(', ') || 'NONE');
 
 
       - name: Look up Issue Type ID (GraphQL via PAT)
