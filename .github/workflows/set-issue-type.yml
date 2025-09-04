@@ -6,6 +6,7 @@ on:
 
 permissions:
   issues: write
+  contents: read
 
 jobs:
   set-type:
@@ -27,6 +28,20 @@ jobs:
       - name: Stop if no mapped type
         if: steps.map.outputs.TYPE_NAME == ''
         run: echo "No matching label for Issue Type. Skipping."
+
+      - name: 🔎 Sanity check PAT can see repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+        script: |
+          const { owner, repo } = context.repo;
+          // Try REST first (clearer errors if the token can't access the repo)
+          try {
+            const r = await github.request('GET /repos/{owner}/{repo}', { owner, repo });
+            console.log(`Repo OK: ${r.data.full_name} (private=${r.data.private})`);
+          } catch (e) {
+            throw new Error(`PAT cannot access ${owner}/${repo}. Likely not selected in the PAT's repo access, or SSO not authorized.\n${e.message}`);
+          }
 
       - name: Inspect owner type (User vs Organization)
         id: owner
@@ -50,6 +65,32 @@ jobs:
         run: |
           echo "Repository owner is a User. Issue Types are org-only. Skipping."
           exit 0
+
+      - name: 🔎 List Issue Types (debug)
+        if: steps.owner.outputs.result == 'Organization'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+        script: |
+          const { owner, repo } = context.repo;
+          const q = `
+            query($owner:String!, $repo:String!) {
+              repository(owner:$owner, name:$repo) {
+                owner {
+                  __typename
+                  ... on Organization {
+                    issueTypes(first:100) { nodes { id name } }
+                  }
+                }
+              }
+            }`;
+          const d = await github.graphql(q, { owner, repo });
+          if (d.repository.owner.__typename !== 'Organization') {
+            throw new Error('Owner is not an Organization.');
+          }
+          const types = d.repository.owner.issueTypes?.nodes || [];
+          console.log('Issue Types found:', types.map(t => `${t.name} (${t.id})`).join(', ') || 'NONE');
+
 
       - name: Look up Issue Type ID (GraphQL via PAT)
         if: steps.map.outputs.TYPE_NAME != '' && steps.owner.outputs.result == 'Organization'
