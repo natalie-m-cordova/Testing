@@ -7,7 +7,7 @@
  *   <!-- PREVIOUS-CONTRIBUTORS:START --> ... <!-- PREVIOUS-CONTRIBUTORS:END -->
  *
  * Expects environment:
- *   - GITHUB_TOKEN (provided automatically in Actions)
+ *   - GITHUB_TOKEN (provided automatically in Actions) OR ORG_GRAPHQL_TOKEN (if configured manually)
  *   - GITHUB_REPOSITORY = "owner/repo" (provided automatically in Actions)
  *
  * Optional env:
@@ -22,9 +22,13 @@ const { restEndpointMethods } = require("@octokit/plugin-rest-endpoint-methods")
 
 const MyOctokit = Octokit.plugin(paginateRest, restEndpointMethods);
 
-const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+// 🔑 Support multiple env var names
+const TOKEN =
+  process.env.GITHUB_TOKEN ||
+  process.env.GH_TOKEN ||
+  process.env.ORG_GRAPHQL_TOKEN;
 if (!TOKEN) {
-  console.error("❌ Missing GITHUB_TOKEN in environment.");
+  console.error("❌ Missing token (expected GITHUB_TOKEN, GH_TOKEN, or ORG_GRAPHQL_TOKEN).");
   process.exit(1);
 }
 
