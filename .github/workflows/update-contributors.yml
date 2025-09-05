@@ -62,8 +62,6 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          add_options: '--all'                 # ensure both files are staged
+          add_options: '--all'                     # stage all tracked changes
           commit_message: 'chore(contributors): update contributors section'
-          file_pattern: |
-            README.md
-            CONTRIBUTING.md
+          ### file_pattern: "README.md CONTRIBUTING.md"
