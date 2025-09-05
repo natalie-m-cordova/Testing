@@ -1,0 +1,37 @@
+name: Update Contributors
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # run daily
+  push:
+    branches: [ main ]
+  issues:
+    types: [opened, closed, edited]
+  pull_request:
+    types: [opened, closed, edited, merged]
+  workflow_dispatch:
+
+jobs:
+  update-contributors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install @octokit/core @octokit/plugin-paginate-rest @octokit/plugin-rest-endpoint-methods
+
+      - name: Update contributors list
+        run: |
+          node .github/scripts/updateContributors.js
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(contributors): update contributors section"
+          file_pattern: "README.md CONTRIBUTORS.md"

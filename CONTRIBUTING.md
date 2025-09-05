@@ -4,6 +4,22 @@
 
 Thank you for your interest in contributing to the **Testing** project! We welcome contributions from everyone. Please review the following guidelines to help us maintain a healthy and productive community.
 
+## Contributors
+
+<p align="center">
+  <!-- CONTRIBUTORS:START -->
+  <!-- CONTRIBUTORS:END -->
+</p>
+
+---
+
+## Previous Contributors
+
+<p align="center">
+  <!-- PREVIOUS-CONTRIBUTORS:START -->
+  <!-- PREVIOUS-CONTRIBUTORS:END -->
+</p>
+
 ## How to Contribute
 
 1. **Fork the Repository**
