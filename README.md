@@ -55,11 +55,17 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ## Contributors
 <!-- CONTRIBUTORS:START -->
-<p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 62 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
-</p>
+<!-- Will be replaced -->
 <!-- CONTRIBUTORS:END -->
+<!-- PREV-BLOCK:START -->
 
+---
+
+## Previous Contributors
+<!-- PREVIOUS-CONTRIBUTORS:START -->
+<!-- will be replaced -->
+<!-- PREVIOUS-CONTRIBUTORS:END -->
+<!-- PREV-BLOCK:END -->
 
 ---
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.

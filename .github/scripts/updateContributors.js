@@ -72,18 +72,19 @@ function replaceSection(filePath, startTag, endTag, replacement) {
     console.log(`ℹ️ Skipping missing file: ${filePath}`);
     return false;
   }
-  const src = fs.readFileSync(filePath, "utf8");
-  const re = new RegExp(
-    `<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`,
-    "m"
-  );
+  const src = fs.readFileSync(filePath, 'utf8');
+  const re = new RegExp(`<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`, 'm');
   if (!re.test(src)) {
     console.warn(`⚠️ Markers not found in ${filePath}: ${startTag} / ${endTag}`);
     return false;
   }
-  const block = `<!-- ${startTag} -->\n${replacement}\n<!-- ${endTag} -->`;
+  const block = `<!-- ${startTag} -->\n${(replacement || '').trim()}\n<!-- ${endTag} -->`;
   const out = src.replace(re, block);
-  fs.writeFileSync(filePath, out, "utf8");
+  if (out === src) {
+    console.log(`ℹ️ ${filePath} section ${startTag} unchanged (content identical)`);
+    return false;
+  }
+  fs.writeFileSync(filePath, out, 'utf8');
   console.log(`✅ Updated ${filePath} section ${startTag}..${endTag}`);
   return true;
 }
