@@ -55,10 +55,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ## Contributors
 <p align="center">
-  <!-- CONTRIBUTORS:START -->
-<p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 57 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
-</p>
+<!-- CONTRIBUTORS:START -->
 <!-- CONTRIBUTORS:END -->
 </p>
 
@@ -66,8 +63,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ## Previous Contributors
 <p align="center">
-  <!-- PREVIOUS-CONTRIBUTORS:START -->
-<!-- none -->
+<!-- PREVIOUS-CONTRIBUTORS:START -->
 <!-- PREVIOUS-CONTRIBUTORS:END -->
 </p>
 
