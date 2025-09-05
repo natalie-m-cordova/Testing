@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@octokit/core": "^7.0.3",
+    "@octokit/plugin-paginate-rest": "^13.1.1",
+    "@octokit/plugin-rest-endpoint-methods": "^16.0.0"
+  }
+}
