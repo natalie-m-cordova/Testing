@@ -2,7 +2,7 @@
  * updateContributors.js
  *
  * Fetch contributors, compute last-12-month activity (commits + issues/PRs created),
- * and update README.md and CONTRIBUTORS.md between markers:
+ * and update README.md and CONTRIBUTING.md between markers:
  *   <!-- CONTRIBUTORS:START --> ... <!-- CONTRIBUTORS:END -->
  *   <!-- PREVIOUS-CONTRIBUTORS:START --> ... <!-- PREVIOUS-CONTRIBUTORS:END -->
  *
@@ -187,11 +187,11 @@ function replaceSection(filePath, startTag, endTag, replacementHTML) {
     const changed = [];
     if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML)) changed.push("README.md active");
     if (replaceSection("README.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousHTML)) changed.push("README.md previous");
-    if (replaceSection("CONTRIBUTORS.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML)) changed.push("CONTRIBUTORS.md active");
-    if (replaceSection("CONTRIBUTORS.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousHTML)) changed.push("CONTRIBUTORS.md previous");
+    if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML)) changed.push("CONTRIBUTING.md active");
+    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousHTML)) changed.push("CONTRIBUTING.md previous");
 
     if (changed.length === 0) {
-      console.log("ℹ️ No files updated. Ensure markers exist in README.md and CONTRIBUTORS.md.");
+      console.log("ℹ️ No files updated. Ensure markers exist in README.md and CONTRIBUTING.md.");
     } else {
       console.log("✅ Updated:", changed.join(", "));
     }
