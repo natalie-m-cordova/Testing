@@ -18,7 +18,7 @@ permissions:
   
 jobs:
   update-contributors:
-    # 👇 This ensures the job runs for all triggers EXCEPT closed PRs that weren't merged
+    # only skip closed-but-not-merged PRs
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 

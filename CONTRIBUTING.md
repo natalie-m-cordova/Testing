@@ -5,20 +5,18 @@
 Thank you for your interest in contributing to the **Testing** project! We welcome contributions from everyone. Please review the following guidelines to help us maintain a healthy and productive community.
 
 ## Contributors
-
-<p align="center">
-  <!-- CONTRIBUTORS:START -->
-  <!-- CONTRIBUTORS:END -->
-</p>
+<!-- CONTRIBUTORS:START -->
+<!-- Will be replaced -->
+<!-- CONTRIBUTORS:END -->
+<!-- PREV-BLOCK:START -->
 
 ---
 
 ## Previous Contributors
-
-<p align="center">
-  <!-- PREVIOUS-CONTRIBUTORS:START -->
-  <!-- PREVIOUS-CONTRIBUTORS:END -->
-</p>
+<!-- PREVIOUS-CONTRIBUTORS:START -->
+<!-- will be replaced -->
+<!-- PREVIOUS-CONTRIBUTORS:END -->
+<!-- PREV-BLOCK:END -->
 
 ## How to Contribute
 
