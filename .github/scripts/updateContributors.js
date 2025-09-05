@@ -115,14 +115,14 @@ async function countIssuesPRs(login, sinceISO) {
   }
 }
 
-function buildHTMLBlock(list, avatarSize) {
+function buildHTMLBlock(list, avatarSize, { wrap = true } = {}) {
   if (!list.length) return '<!-- none -->';
   const items = list.map(p => {
     const title = `${p.login} • ${p.totals.all} contributions (12 mo)`;
     const avatar = `${p.avatar_url}${p.avatar_url.includes("?") ? "&" : "?"}s=${avatarSize}`;
     return `  <a href="${p.html_url}" title="${title}"><img src="${avatar}" width="${avatarSize}px" alt="${p.login}" /></a>`;
   }).join("\n");
-  return `<p align="center">\n${items}\n</p>`;
+  return wrap ? `<p align="center">\n${items}\n</p>` : items;
 }
 
 function replaceSection(filePath, startTag, endTag, replacementHTML) {
@@ -181,14 +181,16 @@ function replaceSection(filePath, startTag, endTag, replacementHTML) {
     const previous = people.filter(p => !p.recent)
       .sort((a,b) => a.login.localeCompare(b.login));
 
-    const activeHTML = buildHTMLBlock(active, AVATAR_SIZE);
-    const previousHTML = buildHTMLBlock(previous, AVATAR_SIZE);
+    const activeWrapped   = buildHTMLBlock(active,   AVATAR_SIZE, { wrap: true  });
+    const previousWrapped = buildHTMLBlock(previous, AVATAR_SIZE, { wrap: true  });
+    const activeInline    = buildHTMLBlock(active,   AVATAR_SIZE, { wrap: false });
+    const previousInline  = buildHTMLBlock(previous, AVATAR_SIZE, { wrap: false });
 
     const changed = [];
-    if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML)) changed.push("README.md active");
-    if (replaceSection("README.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousHTML)) changed.push("README.md previous");
-    if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML)) changed.push("CONTRIBUTING.md active");
-    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousHTML)) changed.push("CONTRIBUTING.md previous");
+    if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeWrapped)) changed.push("README.md active");
+    if (replaceSection("README.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousWrapped)) changed.push("README.md previous");
+    if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeInline)) changed.push("CONTRIBUTING.md active");
+    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousInline)) changed.push("CONTRIBUTING.md previous"
 
     if (changed.length === 0) {
       console.log("ℹ️ No files updated. Ensure markers exist in README.md and CONTRIBUTING.md.");
