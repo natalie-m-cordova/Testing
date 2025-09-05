@@ -190,7 +190,7 @@ function replaceSection(filePath, startTag, endTag, replacementHTML) {
     if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeWrapped)) changed.push("README.md active");
     if (replaceSection("README.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousWrapped)) changed.push("README.md previous");
     if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeInline)) changed.push("CONTRIBUTING.md active");
-    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousInline)) changed.push("CONTRIBUTING.md previous"
+    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousInline)) changed.push("CONTRIBUTING.md previous");
 
     if (changed.length === 0) {
       console.log("ℹ️ No files updated. Ensure markers exist in README.md and CONTRIBUTING.md.");
