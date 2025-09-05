@@ -1,14 +1,16 @@
 # Testing Repository
 
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](LICENSE.md)
-![Last Commit](https://img.shields.io/github/last-commit/NMRCDova/Testing)
-![Issues](https://img.shields.io/github/issues/NMRCDova/Testing)
-![Pull Requests](https://img.shields.io/github/issues-pr/NMRCDova/Testing)
-![Contributors](https://img.shields.io/github/contributors/NMRCDova/Testing)
-<!-- SPRINT BADGE START -->
-![Sprint](https://img.shields.io/badge/Sprint-1--In--Progress-blue)
-<!-- SPRINT BADGE END -->
-![Sandbox](https://img.shields.io/badge/Repo-Sandbox-lightgrey)
+<p>
+  <a href="LICENSE.md">
+    <img alt="License: CC BY 4.0" src="https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg">
+  </a>
+  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/NMRCDova/Testing">
+  <img alt="Issues" src="https://img.shields.io/github/issues/NMRCDova/Testing">
+  <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/NMRCDova/Testing">
+  <img alt="Contributors" src="https://img.shields.io/github/contributors/NMRCDova/Testing">
+  <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-1--In--Progress-blue"><!-- SPRINT BADGE END -->
+  <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-lightgrey">
+</p>
 
 ## Project Overview
 The **Testing** repository is a sandbox project created for learning and experimenting with GitHub features, workflows, and community health files. 
@@ -51,3 +53,6 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ---
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
+
+## Acknowledgments
+This project uses the [git-auto-commit-action](https://github.com/stefanzweifel/git-auto-commit-action) by @stefanzweifel for automating README updates.
