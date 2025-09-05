@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 # Security Policy
 
 This repository is a sandbox for learning and testing GitHub features. While not a production project, we encourage responsible disclosure of any vulnerabilities you may discover.
