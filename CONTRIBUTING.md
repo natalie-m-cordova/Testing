@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 # Contributing to Testing
 
 Thank you for your interest in contributing to the **Testing** project! We welcome contributions from everyone. Please review the following guidelines to help us maintain a healthy and productive community.
@@ -65,7 +67,7 @@ If you have suggestions for improving the template, feel free to open a pull req
 - Be respectful and inclusive.
 - Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - Ask questions if you need help!
-
+- By submitting a contribution, you agree to license your work under the repository’s license (CC BY 4.0).
 ---
 
 Thank you for helping make **Testing** better!
