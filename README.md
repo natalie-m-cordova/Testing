@@ -48,8 +48,24 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 - **Sprint 2 – Advanced Workflow Automation** *(TBD)*
 - **Sprint 3 – Community & Collaboration** *(TBD)*
 
+---
+
 ## Community & Contribution
 Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING.md) before submitting issues or pull requests.
+
+## Contributors
+<p align="center">
+  <!-- CONTRIBUTORS:START -->
+  <!-- CONTRIBUTORS:END -->
+</p>
+
+---
+
+## Previous Contributors
+<p align="center">
+  <!-- PREVIOUS-CONTRIBUTORS:START -->
+  <!-- PREVIOUS-CONTRIBUTORS:END -->
+</p>
 
 ---
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
