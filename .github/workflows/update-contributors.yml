@@ -1,0 +1,67 @@
+name: Update Contributors
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # run daily
+  push:
+    branches: [ main ]
+  issues:
+    types: [opened, closed, edited]
+  pull_request:
+    types: [opened, closed, edited, reopened, synchronize, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+  
+jobs:
+  update-contributors:
+    # only skip closed-but-not-merged PRs
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install @octokit/core @octokit/plugin-paginate-rest @octokit/plugin-rest-endpoint-methods
+
+      - name: Update contributors list
+        env:
+          # pass a token for the script to read:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # optional: if you also maintain an org/repo secret with this name
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          # optional knobs:
+          CONTRIB_SINCE_DAYS: "365"
+          CONTRIB_AVATAR_SIZE: "64"
+        run: node .github/scripts/updateContributors.js
+
+      - name: Show diff names before commit
+        run: |
+          git status --porcelain
+          echo "Changed files:"
+          git --no-pager diff --name-only
+
+      - name: Print extracted sections (sanity check)
+        run: |
+          echo "---- README.md CONTRIBUTORS ----"
+          awk '/CONTRIBUTORS:START/{flag=1;next}/CONTRIBUTORS:END/{flag=0}flag' README.md | sed -n '1,120p'
+          echo "---- CONTRIBUTING.md CONTRIBUTORS ----"
+          awk '/CONTRIBUTORS:START/{flag=1;next}/CONTRIBUTORS:END/{flag=0}flag' CONTRIBUTING.md | sed -n '1,120p'
+
+      - name: Commit changes
+        if: github.event_name != 'pull_request' && github.ref_name == 'main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          add_options: '--all'                     # stage all tracked changes
+          commit_message: 'chore(contributors): update contributors section'
+          ### file_pattern: "README.md CONTRIBUTING.md"

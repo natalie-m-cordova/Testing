@@ -4,6 +4,14 @@
 
 Thank you for your interest in contributing to the **Testing** project! We welcome contributions from everyone. Please review the following guidelines to help us maintain a healthy and productive community.
 
+## Contributors
+<!-- CONTRIBUTORS:START -->
+<p align="center">
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 72 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+</p>
+<!-- CONTRIBUTORS:END -->
+
+
 ## How to Contribute
 
 1. **Fork the Repository**

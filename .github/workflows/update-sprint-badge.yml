@@ -28,7 +28,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Get all milestones (open first, then recently closed as fallback)
+            // Get milestones (open first)
             const open = await github.rest.issues.listMilestones({
               owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
             });
@@ -44,60 +44,43 @@ jobs:
               chosen = closed.data[0] || null;
               if (chosen) { status = 'Completed'; color = 'success'; }
             } else {
-              // Infer status for open milestone
               const today = new Date().toISOString().slice(0,10);
               const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
 
-              // Use issue stats to infer progress
-              const mstats = await github.rest.issues.listForRepo({
-                owner, repo, milestone: chosen.number, state: 'all', per_page: 1
-              });
-              // GitHub API doesn't return closed count here efficiently without pagination,
-              // so rely on milestone fields:
               const closedCount = chosen.closed_issues || 0;
-              const openCount = chosen.open_issues || 0;
-
               if (due && due < today) { status = 'Overdue'; color = 'red'; }
               else if (closedCount > 0) { status = 'In Progress'; color = 'blue'; }
               else { status = 'Planned'; color = 'lightgrey'; }
             }
 
-            // Extract sprint number from title if possible
-            let sprintNum = '';
-            if (chosen && chosen.title) {
-              const m = chosen.title.match(/Sprint\s+(\d+)/i);
-              sprintNum = m ? m[1] : chosen.title;
-            } else {
-              sprintNum = 'N/A';
-            }
-
-            // Build shields.io label (spaces -> hyphens, status with double dashes between words)
-            function hyphenate(s){ return String(s).trim().replace(/\s+/g, '-'); }
+            function hyphenate(s){ return String(s || '').trim().replace(/\s+/g, '-'); }
+            const m = chosen && chosen.title ? chosen.title.match(/Sprint\s+(\d+)/i) : null;
+            const sprintNum = m ? m[1] : (chosen ? chosen.title : 'N-A');
             const statusLabel = String(status).replace(/\s+/g, '--');
             const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
 
             core.setOutput('badge', `![Sprint](https://img.shields.io/badge/${encodeURIComponent(label)}-${color})`);
-            core.setOutput('title', chosen ? chosen.title : 'No Active Sprint');
-            core.setOutput('status', status);
 
-      - name: Update README badge between markers
+      - name: Update README badge between inline markers
+        env:
+          BADGE: ${{ steps.sprint.outputs.badge }}
         run: |
-          FILE="README.md"
-          if [ ! -f "$FILE" ]; then
-            echo "README.md not found in repo root. Ensure file exists."
-            exit 1
-          fi
-          BADGE='${{ steps.sprint.outputs.badge }}'
-          # Replace content between markers
-          awk -v badge="$BADGE" '
-            BEGIN{inblock=0}
-            /<!-- SPRINT BADGE START -->/ {print; print badge; inblock=1; next}
-            /<!-- SPRINT BADGE END -->/ {print; inblock=0; next}
-            inblock==0 {print}
-          ' "$FILE" > README.md.tmp && mv README.md.tmp "$FILE"
+          python - << 'PY'
+          import os, re, sys
+          fn = "README.md"
+          with open(fn, "r", encoding="utf-8") as f:
+            txt = f.read()
+          badge = os.environ["BADGE"]
+          pat = r"<!--\s*SPRINT BADGE START\s*-->.*?<!--\s*SPRINT BADGE END\s*-->"
+          repl = f"<!-- SPRINT BADGE START -->{badge}<!-- SPRINT BADGE END -->"
+          new = re.sub(pat, repl, txt, flags=re.S)
+          with open(fn + ".tmp", "w", encoding="utf-8") as f:
+            f.write(new)
+          import os; os.replace(fn + ".tmp", fn)
+          PY      
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(readme): update Sprint badge from milestone"
+          commit_message: "chore(readme): update inline Sprint badge from milestone"
           file_pattern: README.md
