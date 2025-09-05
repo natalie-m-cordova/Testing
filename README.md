@@ -5,9 +5,7 @@
 ![Issues](https://img.shields.io/github/issues/NMRCDova/Testing)
 ![Pull Requests](https://img.shields.io/github/issues-pr/NMRCDova/Testing)
 ![Contributors](https://img.shields.io/github/contributors/NMRCDova/Testing)
-<!-- SPRINT BADGE START -->
-![Sprint](https://img.shields.io/badge/Sprint-1--In--Progress-blue)
-<!-- SPRINT BADGE END -->
+<!-- SPRINT BADGE START -->![Sprint](https://img.shields.io/badge/Sprint-1--In--Progress-blue)<!-- SPRINT BADGE END -->
 ![Sandbox](https://img.shields.io/badge/Repo-Sandbox-lightgrey)
 
 ## Project Overview
@@ -51,3 +49,6 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ---
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
+
+## Acknowledgments
+This project uses the [git-auto-commit-action](https://github.com/stefanzweifel/git-auto-commit-action) by @stefanzweifel for automating README updates.
