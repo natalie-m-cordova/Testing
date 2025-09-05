@@ -45,11 +45,25 @@ jobs:
           CONTRIB_AVATAR_SIZE: "64"
         run: node .github/scripts/updateContributors.js
 
+      - name: Show diff names before commit
+        run: |
+          git status --porcelain
+          echo "Changed files:"
+          git --no-pager diff --name-only
+
+      - name: Print extracted sections (sanity check)
+        run: |
+          echo "---- README.md CONTRIBUTORS ----"
+          awk '/CONTRIBUTORS:START/{flag=1;next}/CONTRIBUTORS:END/{flag=0}flag' README.md | sed -n '1,120p'
+          echo "---- CONTRIBUTING.md CONTRIBUTORS ----"
+          awk '/CONTRIBUTORS:START/{flag=1;next}/CONTRIBUTORS:END/{flag=0}flag' CONTRIBUTING.md | sed -n '1,120p'
+
       - name: Commit changes
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(contributors): update contributors section"
+          add_options: '--all'                 # ensure both files are staged
+          commit_message: 'chore(contributors): update contributors section'
           file_pattern: |
             README.md
             CONTRIBUTING.md
