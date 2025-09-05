@@ -22,11 +22,6 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      issues: read
-      pull-requests: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,7 +46,10 @@ jobs:
         run: node .github/scripts/updateContributors.js
 
       - name: Commit changes
+        if: github.event_name != 'pull_request' && github.ref_name == 'main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore(contributors): update contributors section"
-          file_pattern: "README.md CONTRIBUTING.md"
+          file_pattern: |
+            README.md
+            CONTRIBUTING.md
