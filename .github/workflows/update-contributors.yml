@@ -11,6 +11,11 @@ on:
     types: [opened, closed, edited, reopened, synchronize, closed]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+  
 jobs:
   update-contributors:
     # only skip closed-but-not-merged PRs
