@@ -5,6 +5,7 @@
  * and update README.md and CONTRIBUTING.md between markers:
  *   <!-- CONTRIBUTORS:START --> ... <!-- CONTRIBUTORS:END -->
  *   <!-- PREVIOUS-CONTRIBUTORS:START --> ... <!-- PREVIOUS-CONTRIBUTORS:END -->
+ *   <!-- PREV-BLOCK:START --> ... <!-- PREV-BLOCK:END -->   (wrapper to hide whole section when empty)
  *
  * Expects environment:
  *   - GITHUB_TOKEN (provided automatically in Actions) OR ORG_GRAPHQL_TOKEN (if configured manually)
@@ -27,6 +28,7 @@ const TOKEN =
   process.env.GITHUB_TOKEN ||
   process.env.GH_TOKEN ||
   process.env.ORG_GRAPHQL_TOKEN;
+
 if (!TOKEN) {
   console.error("❌ Missing token (expected GITHUB_TOKEN, GH_TOKEN, or ORG_GRAPHQL_TOKEN).");
   process.exit(1);
@@ -44,6 +46,7 @@ const AVATAR_SIZE = parseInt(process.env.CONTRIB_AVATAR_SIZE || "64", 10);
 
 const octokit = new MyOctokit({ auth: TOKEN });
 
+// ----- Helpers -----
 async function paginate(method, params) {
   const out = [];
   for await (const res of octokit.paginate.iterator(method, params)) {
@@ -52,25 +55,96 @@ async function paginate(method, params) {
   return out;
 }
 
+function buildAvatarGrid(list, size) {
+  if (!list.length) return "<!-- none -->";
+  const items = list
+    .map((p) => {
+      const title = `${p.login} • ${p.totals.all} contributions (12 mo)`;
+      const avatar = `${p.avatar_url}${p.avatar_url.includes("?") ? "&" : "?"}s=${size}`;
+      return `  <a href="${p.html_url}" title="${title}"><img src="${avatar}" width="${size}px" alt="${p.login}" /></a>`;
+    })
+    .join("\n");
+  return `<p align="center">\n${items}\n</p>`;
+}
+
+function replaceSection(filePath, startTag, endTag, replacement) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`ℹ️ Skipping missing file: ${filePath}`);
+    return false;
+  }
+  const src = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(
+    `<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`,
+    "m"
+  );
+  if (!re.test(src)) {
+    console.warn(`⚠️ Markers not found in ${filePath}: ${startTag} / ${endTag}`);
+    return false;
+  }
+  const block = `<!-- ${startTag} -->\n${replacement}\n<!-- ${endTag} -->`;
+  const out = src.replace(re, block);
+  fs.writeFileSync(filePath, out, "utf8");
+  console.log(`✅ Updated ${filePath} section ${startTag}..${endTag}`);
+  return true;
+}
+
+// Replace or remove an entire wrapper block (e.g., PREV-BLOCK)
+function replaceWholeBlock(filePath, wrapperStart, wrapperEnd, newContentOrEmpty) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`ℹ️ Skipping missing file: ${filePath}`);
+    return false;
+  }
+  const src = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(
+    `<!--\\s*${wrapperStart}\\s*-->[\\s\\S]*?<!--\\s*${wrapperEnd}\\s*-->`,
+    "m"
+  );
+  if (!re.test(src)) {
+    // Wrapper missing: nothing to do (stay graceful).
+    console.warn(`⚠️ Wrapper not found in ${filePath}: ${wrapperStart} / ${wrapperEnd}`);
+    return false;
+  }
+  const out =
+    newContentOrEmpty.trim().length > 0
+      ? src.replace(
+          re,
+          `<!-- ${wrapperStart} -->\n${newContentOrEmpty}\n<!-- ${wrapperEnd} -->`
+        )
+      : src.replace(re, ""); // remove the whole block if empty
+  fs.writeFileSync(filePath, out, "utf8");
+  console.log(
+    `✅ ${newContentOrEmpty.trim().length ? "Updated" : "Removed"} wrapper ${wrapperStart}..${wrapperEnd} in ${filePath}`
+  );
+  return true;
+}
+
+// ----- Data fetch -----
 async function listContributors() {
   // Primary: repo contributors
   const contributors = await paginate(octokit.rest.repos.listContributors, {
-    owner, repo, per_page: 100
+    owner,
+    repo,
+    per_page: 100,
   });
+
   const users = contributors
-    .filter(c => c.type === "User" && !/bot/i.test(c.login))
-    .map(c => ({
+    .filter((c) => c.type === "User" && !/bot/i.test(c.login))
+    .map((c) => ({
       login: c.login,
       html_url: c.html_url || `https://github.com/${c.login}`,
       avatar_url: c.avatar_url,
       totals: { commits: 0, issuesPRs: 0, all: 0 },
-      recent: false
+      recent: false,
     }));
 
-  // Fallback for very new repos with no contributors
+  // Fallback for very new repos with no contributors yet
   if (users.length === 0) {
     try {
-      const events = await paginate(octokit.rest.repos.listPublicEvents, { owner, repo, per_page: 100 });
+      const events = await paginate(octokit.rest.repos.listPublicEvents, {
+        owner,
+        repo,
+        per_page: 100,
+      });
       const seen = new Set();
       for (const e of events) {
         const u = e.actor && e.actor.login;
@@ -81,7 +155,7 @@ async function listContributors() {
             html_url: `https://github.com/${u}`,
             avatar_url: e.actor.avatar_url,
             totals: { commits: 0, issuesPRs: 0, all: 0 },
-            recent: false
+            recent: false,
           });
         }
       }
@@ -95,7 +169,11 @@ async function listContributors() {
 async function countCommits(login, sinceISO) {
   try {
     const commits = await paginate(octokit.rest.repos.listCommits, {
-      owner, repo, author: login, since: sinceISO, per_page: 100
+      owner,
+      repo,
+      author: login,
+      since: sinceISO,
+      per_page: 100,
     });
     return commits.length;
   } catch (e) {
@@ -107,7 +185,10 @@ async function countCommits(login, sinceISO) {
 async function countIssuesPRs(login, sinceISO) {
   try {
     const q = `repo:${owner}/${repo} author:${login} created:>=${sinceISO}`;
-    const res = await octokit.rest.search.issuesAndPullRequests({ q, per_page: 1 });
+    const res = await octokit.rest.search.issuesAndPullRequests({
+      q,
+      per_page: 1,
+    });
     return res.data.total_count || 0;
   } catch (e) {
     console.warn(`⚠️ Issues/PRs search failed for ${login}: ${e.message}`);
@@ -115,48 +196,10 @@ async function countIssuesPRs(login, sinceISO) {
   }
 }
 
-function buildHTMLBlock(list, avatarSize, { wrap = true } = {}) {
-  if (!list.length) return '<!-- none -->';
-  const items = list.map(p => {
-    const title = `${p.login} • ${p.totals.all} contributions (12 mo)`;
-    const avatar = `${p.avatar_url}${p.avatar_url.includes("?") ? "&" : "?"}s=${avatarSize}`;
-    return `  <a href="${p.html_url}" title="${title}"><img src="${avatar}" width="${avatarSize}px" alt="${p.login}" /></a>`;
-  }).join("\n");
-  return wrap ? `<p align="center">\n${items}\n</p>` : items;
-}
-
-function replaceSection(filePath, startTag, endTag, replacementHTML) {
-  if (!fs.existsSync(filePath)) {
-    console.log(`ℹ️ Skipping missing file: ${filePath}`);
-    return false;
-  }
-  const src = fs.readFileSync(filePath, "utf8");
-
-  // Accept both correct and common misspelling CONTIBUTORS, flexible whitespace
-  const mk = (t) => t.replace("CONTRIBUTORS", "CONTIBUTORS");
-  const pattern = new RegExp(`<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`, "m");
-  const patternAlt = new RegExp(`<!--\\s*${mk(startTag)}\\s*-->[\\s\\S]*?<!--\\s*${mk(endTag)}\\s*-->`, "m");
-
-  const block = `<!-- ${startTag} -->\n${replacementHTML}\n<!-- ${endTag} -->`;
-
-  let out = src;
-  if (pattern.test(out)) {
-    out = out.replace(pattern, block);
-  } else if (patternAlt.test(out)) {
-    out = out.replace(patternAlt, block);
-  } else {
-    console.warn(`⚠️ Markers not found in ${filePath}: ${startTag} / ${endTag}`);
-    return false;
-  }
-
-  fs.writeFileSync(filePath, out, "utf8");
-  console.log(`✅ Updated ${filePath} section ${startTag}..${endTag}`);
-  return true;
-}
-
+// ----- Main -----
 (async function main() {
   try {
-    const sinceISO = new Date(Date.now() - sinceDays*24*60*60*1000).toISOString();
+    const sinceISO = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
 
     const people = await listContributors();
     if (people.length === 0) {
@@ -164,11 +207,10 @@ function replaceSection(filePath, startTag, endTag, replacementHTML) {
       process.exit(0);
     }
 
-    // Compute activity per contributor
     for (const p of people) {
       const [commits, issuesPRs] = await Promise.all([
         countCommits(p.login, sinceISO),
-        countIssuesPRs(p.login, sinceISO)
+        countIssuesPRs(p.login, sinceISO),
       ]);
       p.totals.commits = commits;
       p.totals.issuesPRs = issuesPRs;
@@ -176,29 +218,55 @@ function replaceSection(filePath, startTag, endTag, replacementHTML) {
       p.recent = p.totals.all > 0;
     }
 
-    const active = people.filter(p => p.recent)
-      .sort((a,b) => (b.totals.all - a.totals.all) || a.login.localeCompare(b.login));
-    const previous = people.filter(p => !p.recent)
-      .sort((a,b) => a.login.localeCompare(b.login));
+    const active = people
+      .filter((p) => p.recent)
+      .sort((a, b) => b.totals.all - a.totals.all || a.login.localeCompare(b.login));
 
-    const activeWrapped   = buildHTMLBlock(active,   AVATAR_SIZE, { wrap: true  });
-    const previousWrapped = buildHTMLBlock(previous, AVATAR_SIZE, { wrap: true  });
-    const activeInline    = buildHTMLBlock(active,   AVATAR_SIZE, { wrap: false });
-    const previousInline  = buildHTMLBlock(previous, AVATAR_SIZE, { wrap: false });
+    const previous = people
+      .filter((p) => !p.recent)
+      .sort((a, b) => a.login.localeCompare(b.login));
+
+    const activeHTML = buildAvatarGrid(active, AVATAR_SIZE);
+    const previousHTML = buildAvatarGrid(previous, AVATAR_SIZE);
+
+    // Build a full "Previous Contributors" block (header + inner markers) if non-empty
+    const prevBlock = previous.length
+      ? [
+          "## Previous Contributors",
+          "<!-- PREVIOUS-CONTRIBUTORS:START -->",
+          previousHTML,
+          "<!-- PREVIOUS-CONTRIBUTORS:END -->",
+        ].join("\n")
+      : ""; // empty => wrapper will be removed entirely
 
     const changed = [];
-    if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeWrapped)) changed.push("README.md active");
-    if (replaceSection("README.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousWrapped)) changed.push("README.md previous");
-    if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeInline)) changed.push("CONTRIBUTING.md active");
-    if (replaceSection("CONTRIBUTING.md", "PREVIOUS-CONTRIBUTORS:START", "PREVIOUS-CONTRIBUTORS:END", previousInline)) changed.push("CONTRIBUTING.md previous");
+
+    // README
+    if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML))
+      changed.push("README.md active");
+
+    // Update or remove entire previous block via wrapper
+    replaceWholeBlock("README.md", "PREV-BLOCK:START", "PREV-BLOCK:END", prevBlock);
+
+    // CONTRIBUTING
+    if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML))
+      changed.push("CONTRIBUTING.md active");
+
+    replaceWholeBlock(
+      "CONTRIBUTING.md",
+      "PREV-BLOCK:START",
+      "PREV-BLOCK:END",
+      prevBlock
+    );
 
     if (changed.length === 0) {
-      console.log("ℹ️ No files updated. Ensure markers exist in README.md and CONTRIBUTING.md.");
+      console.log("ℹ️ Sections updated (or removed) as needed. Ensure markers exist in both files.");
     } else {
       console.log("✅ Updated:", changed.join(", "));
     }
   } catch (err) {
     console.error("❌ updateContributors.js failed:", err);
+    console.error(err.stack || err);
     process.exit(1);
   }
 })();

@@ -54,22 +54,18 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING.md) before submitting issues or pull requests.
 
 ## Contributors
-<p align="center">
 <!-- CONTRIBUTORS:START -->
-<p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 59 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
-</p>
+<!-- Will be replaced -->
 <!-- CONTRIBUTORS:END -->
-</p>
+<!-- PREV-BLOCK:START -->
 
 ---
 
 ## Previous Contributors
-<p align="center">
 <!-- PREVIOUS-CONTRIBUTORS:START -->
-<!-- none -->
+<!-- will be replaced -->
 <!-- PREVIOUS-CONTRIBUTORS:END -->
-</p>
+<!-- PREV-BLOCK:END -->
 
 ---
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
