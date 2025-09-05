@@ -62,16 +62,22 @@ jobs:
             core.setOutput('badge', `![Sprint](https://img.shields.io/badge/${encodeURIComponent(label)}-${color})`);
 
       - name: Update README badge between inline markers
-        shell: bash
+        env:
+          BADGE: ${{ steps.sprint.outputs.badge }}
         run: |
-          FILE="README.md"
-          if [ ! -f "$FILE" ]; then
-            echo "README.md not found in repo root. Ensure file exists."
-            exit 1
-          fi
-          BADGE='${{ steps.sprint.outputs.badge }}'
-          # Replace any content between the inline markers with the new badge, preserving single-line layout
-          perl -0777 -pe "s/<!-- SPRINT BADGE START -->.*?<!-- SPRINT BADGE END -->/<!-- SPRINT BADGE START -->${BADGE}<!-- SPRINT BADGE END -->/s" "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+          python - << 'PY'
+          import os, re, sys
+          fn = "README.md"
+          with open(fn, "r", encoding="utf-8") as f:
+            txt = f.read()
+          badge = os.environ["BADGE"]
+          pat = r"<!--\s*SPRINT BADGE START\s*-->.*?<!--\s*SPRINT BADGE END\s*-->"
+          repl = f"<!-- SPRINT BADGE START -->{badge}<!-- SPRINT BADGE END -->"
+          new = re.sub(pat, repl, txt, flags=re.S)
+          with open(fn + ".tmp", "w", encoding="utf-8") as f:
+            f.write(new)
+          import os; os.replace(fn + ".tmp", fn)
+          PY      
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
