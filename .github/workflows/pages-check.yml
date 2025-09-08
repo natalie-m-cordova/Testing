@@ -1,0 +1,15 @@
+name: Verify Pages scaffold
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure /docs exists
+        run: |
+          test -d docs || (echo "::error::docs/ folder missing"; exit 1)
+          test -f docs/index.html || (echo "::error::docs/index.html missing"; exit 1)
