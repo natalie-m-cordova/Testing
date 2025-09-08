@@ -28,7 +28,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Get milestones (open first)
+            // 1) Prefer earliest open milestone (by due date asc)
             const open = await github.rest.issues.listMilestones({
               owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
             });
@@ -38,6 +38,7 @@ jobs:
             let color = 'lightgrey';
 
             if (!chosen) {
+              // 2) Otherwise, most recent closed milestone
               const closed = await github.rest.issues.listMilestones({
                 owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
               });
@@ -46,8 +47,8 @@ jobs:
             } else {
               const today = new Date().toISOString().slice(0,10);
               const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
-
               const closedCount = chosen.closed_issues || 0;
+
               if (due && due < today) { status = 'Overdue'; color = 'red'; }
               else if (closedCount > 0) { status = 'In Progress'; color = 'blue'; }
               else { status = 'Planned'; color = 'lightgrey'; }
@@ -59,27 +60,35 @@ jobs:
             const statusLabel = String(status).replace(/\s+/g, '--');
             const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
 
-            core.setOutput('badge', `![Sprint](https://img.shields.io/badge/${encodeURIComponent(label)}-${color})`);
+            const badge = `![Sprint](https://img.shields.io/badge/${encodeURIComponent(label)}-${color})`;
+            core.setOutput('badge', badge);
 
       - name: Update README badge between inline markers
+        if: ${{ steps.sprint.outputs.badge != '' }}
         env:
           BADGE: ${{ steps.sprint.outputs.badge }}
         run: |
-          python - << 'PY'
+          python - <<'PY'
           import os, re, sys
           fn = "README.md"
           with open(fn, "r", encoding="utf-8") as f:
-            txt = f.read()
-          badge = os.environ["BADGE"]
+              txt = f.read()
+          badge = os.environ.get("BADGE", "").strip()
+          if not badge:
+              print("No BADGE provided; skipping.")
+              sys.exit(0)
+          # Replace ONLY the inline-badge section
           pat = r"<!--\s*SPRINT BADGE START\s*-->.*?<!--\s*SPRINT BADGE END\s*-->"
           repl = f"<!-- SPRINT BADGE START -->{badge}<!-- SPRINT BADGE END -->"
           new = re.sub(pat, repl, txt, flags=re.S)
-          with open(fn + ".tmp", "w", encoding="utf-8") as f:
-            f.write(new)
-          import os; os.replace(fn + ".tmp", fn)
-          PY      
+          if new == txt:
+              print("No change to README.md")
+          with open(fn, "w", encoding="utf-8") as f:
+              f.write(new)
+          PY
 
       - name: Commit changes
+        if: ${{ steps.sprint.outputs.badge != '' }}
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore(readme): update inline Sprint badge from milestone"
