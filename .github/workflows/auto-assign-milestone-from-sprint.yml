@@ -21,21 +21,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Determine sprint from labels or input
+      - name: Determine sprint from labels or input (robust)
         id: find
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           result-encoding: string
           script: |
-            // Inputs (workflow_dispatch can override)
+            // Inputs (manual override supported)
             const inputSprint = core.getInput('sprint')?.trim();
             let sprintLabel = inputSprint || '';
             let issueNumber = core.getInput('issue_number')?.trim();
-
             const { owner, repo } = context.repo;
 
-            // Determine issue number from event if not provided
+            // Resolve issue number
             if (!issueNumber) {
               issueNumber = context.payload.issue?.number;
             }
@@ -43,27 +42,39 @@ jobs:
               core.setFailed('No issue number available. Provide via dispatch input or trigger on an issue event.');
               return;
             }
+            const num = parseInt(issueNumber, 10);
 
-            // Determine sprint label from issue labels if not provided
+            // If not overridden, fetch the CURRENT labels via REST (don’t trust payload)
             if (!sprintLabel) {
-              const labels = (context.payload.issue?.labels || []).map(l => typeof l === 'string' ? l : l.name);
-              // collect all "Sprint N" hits, choose highest N if multiple
-              const nums = labels.map(name => {
-                // match "Sprint 1", "Sprint 1 – Planned", etc.
-                const m = name.match(/^Sprint\s+(\d+)\b/i);
-                return m ? Number(m[1]) : null;
-              }).filter(n => Number.isInteger(n));
-              if (nums.length === 0) {
-                core.setOutput('issue', String(issueNumber));
-                core.setOutput('sprint', '');
-                return;
+              const issue = (await github.rest.issues.get({ owner, repo, issue_number: num })).data;
+              const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l.name);
+
+              // Accept Sprint label formats:
+              // "Sprint 2", "Sprint-2", "Sprint:2", "Sprint2", and variants like "Sprint 2 – Planned"
+              const rx = /^sprint[\s:\-]*?(\d+)\b/i;
+
+              // Collect all matching numbers; pick highest if multiple
+              const nums = [];
+              for (const name of labels) {
+                const m = name.match(rx);
+                if (m) nums.push(Number(m[1]));
               }
-              const n = Math.max(...nums);
-              sprintLabel = `Sprint ${n}`;
+
+              if (nums.length === 0) {
+                // As a bonus fallback, try parsing from the issue title if it contains a Sprint tag users typed in
+                const title = issue.title || '';
+                const mTitle = title.match(rx);
+                if (mTitle) nums.push(Number(mTitle[1]));
+              }
+
+              if (nums.length) {
+                const max = Math.max(...nums);
+                sprintLabel = `Sprint ${max}`;
+              }
             }
 
-            core.setOutput('issue', String(issueNumber));
-            core.setOutput('sprint', sprintLabel);
+            core.setOutput('issue', String(num));
+            core.setOutput('sprint', sprintLabel || '');
 
       - name: Stop if no Sprint label found
         if: steps.find.outputs.sprint == ''
@@ -95,8 +106,8 @@ jobs:
             const closed = await listMilestones('closed');
             const all = [...open, ...closed];
 
-            // Match titles that BEGIN with "Sprint N" (case-insensitive), e.g.
-            // "Sprint 2", "Sprint 2 – Planned", "Sprint 2 - Anything"
+            // Match titles that BEGIN with "Sprint N" (case-insensitive).
+            // E.g., "Sprint 2", "Sprint 2 – Planned", "Sprint 2 - Anything"
             const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const re = new RegExp(`^${esc(sprintLabel)}\\b`, 'i');
             const candidates = all.filter(m => re.test(m.title));
@@ -106,7 +117,7 @@ jobs:
               return;
             }
 
-            // Prefer an OPEN milestone; otherwise take the first candidate (earliest due_on)
+            // Prefer OPEN milestone, else first candidate (earliest due_on)
             const chosen = candidates.find(m => m.state === 'open') || candidates[0];
 
             if (currentMilestone === chosen.title) {
