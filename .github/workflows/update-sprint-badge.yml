@@ -60,7 +60,7 @@ jobs:
             const statusLabel = String(status).replace(/\s+/g, '--');
             const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
 
-            const badge = `![Sprint](https://img.shields.io/badge/${encodeURIComponent(label)}-${color})`;
+            const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}>`;
             core.setOutput('badge', badge);
 
       - name: Update README badge between inline markers
