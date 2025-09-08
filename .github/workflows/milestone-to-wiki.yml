@@ -1,4 +1,4 @@
-name: Milestone → Wiki (foldered Sprints + Sidebar + All page)
+name: Milestone → Wiki (foldered Sprints + Sidebar + All page + Dynamic Home)
 
 on:
   milestone:
@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  MAX_LATEST: "3"   # set "2" if you want only the last two sprints in the sidebar
+  MAX_LATEST: "3"   # set "2" to keep only two latest closed sprints in the sidebar
 
 jobs:
   export-sprint-to-wiki:
@@ -26,7 +26,7 @@ jobs:
           path: wiki
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Sprint pages + update sidebar + All page
+      - name: Build Sprint pages + update sidebar + All page + Home
         uses: actions/github-script@v7
         env:
           WIKI_DIR: wiki
@@ -45,12 +45,9 @@ jobs:
             const fmtDate = (s) => s ? new Date(s).toISOString().slice(0,10) : '—';
             const esc = (s) => String(s || '').replace(/\r?\n/g, ' ').trim();
             const mkdirp = (p) => fs.mkdirSync(p, { recursive: true });
-            const writeIfMissing = (file, content) => { if (!fs.existsSync(file)) fs.writeFileSync(file, content, 'utf8'); };
-
-            // Keep slashes for folder structure, sanitize other chars
             const safePath = (title) => String(title).replace(/[<>:"|?*]/g, '-').replace(/\s+/g, ' ').trim();
 
-            // Determine which milestone to export (for Review.md full content)
+            // Which milestone to write full Review for (optional override)
             let milestoneNumber = core.getInput('milestone_number');
             if (!milestoneNumber && context.payload?.milestone?.number) {
               milestoneNumber = String(context.payload.milestone.number);
@@ -128,7 +125,7 @@ jobs:
               ].join('\n');
               fs.writeFileSync(reviewFile, reviewMd, 'utf8');
 
-              // Retro page scaffold (leave existing content if it already exists)
+              // Retro page scaffold (keep existing if present)
               const retroFile = path.join(sprintFolder, 'Retro.md');
               if (!fs.existsSync(retroFile)) {
                 fs.writeFileSync(retroFile, [
@@ -153,21 +150,13 @@ jobs:
               catch (e) { core.warning(`Could not write selected milestone #${milestoneNumber}: ${e.message}`); }
             }
 
-            // Ensure foundational pages exist
-            const homeFile = path.join(wikiDir, 'Home.md');
-            if (!fs.existsSync(homeFile)) {
-              fs.writeFileSync(homeFile, '# Project Wiki\n\nWelcome to the Wiki. Use the sidebar to navigate recent sprints and practices.\n', 'utf8');
-            }
-
-            // Practices/How-we-work.md
+            // Ensure Practices and Templates exist
             const practicesFile = path.join(wikiDir, 'Practices', 'How-we-work.md');
             mkdirp(path.dirname(practicesFile));
             if (!fs.existsSync(practicesFile)) {
               fs.writeFileSync(practicesFile,
                 '# Practices – How we work\n\n- Definition of Done\n- Branching strategy\n- Estimation scale\n', 'utf8');
             }
-
-            // Templates/README.md
             const templatesFile = path.join(wikiDir, 'Templates', 'README.md');
             mkdirp(path.dirname(templatesFile));
             if (!fs.existsSync(templatesFile)) {
@@ -175,13 +164,12 @@ jobs:
                 '# Templates\n\n- Sprint Review template\n- Sprint Retro template\n', 'utf8');
             }
 
-            // Build/refresh "All Sprints" landing page with every milestone
+            // Build/refresh "All Sprints" page listing all milestones
             const allMilestones = [
-              ...closedMilestones.map(m => ({ ...m, _stateOrder: 0 })), // closed first by due desc already
-              ...openMilestones.map(m => ({ ...m, _stateOrder: 1 }))    // then open by due asc
+              ...closedMilestones.map(m => ({ ...m, _stateOrder: 0 })), // closed first (we'll render in desc due)
+              ...openMilestones.map(m => ({ ...m, _stateOrder: 1 }))    // then open (asc due)
             ];
 
-            // Ensure each sprint has folder + stub pages & collect rows
             const rows = allMilestones.map(m => {
               const sm = (m.title || '').match(/(Sprint\s+\d+)/i);
               const base = sm ? sm[1] : (m.title || 'Sprint');
@@ -205,14 +193,16 @@ jobs:
               const retroLink  = `[[Retro|${basePath}/Retro]]`;
 
               return {
-                sortKey: `${m._stateOrder}:${m.due_on || ''}:${base.toLowerCase()}`,
+                isClosed: m.state === 'closed',
+                dueOn: m.due_on || '',
                 md: `| [[${base}|${basePath}]] | ${statePretty} | ${due} | ${closed} | ${reviewLink} · ${retroLink} |`
               };
             });
 
-            // Sort rows: closed (by due desc) top section, then open (by due asc)
-            const closedRows = rows.filter(r => r.sortKey.startsWith('0:')).sort((a,b) => (a.sortKey < b.sortKey ? 1 : -1));
-            const openRows   = rows.filter(r => r.sortKey.startsWith('1:')).sort((a,b) => (a.sortKey < b.sortKey ? -1 : 1));
+            const closedRows = rows.filter(r => r.isClosed)
+              .sort((a,b) => (a.dueOn < b.dueOn ? 1 : -1));
+            const openRows   = rows.filter(r => !r.isClosed)
+              .sort((a,b) => (a.dueOn < b.dueOn ? -1 : 1));
 
             const allMd = [
               '# All Sprints',
@@ -241,15 +231,12 @@ jobs:
             const maxLatest = parseInt(process.env.MAX_LATEST || '3', 10);
             const latest = closedMilestones.slice(0, maxLatest);
 
-            const sprintBlocks = latest.map(m => {
+            const sidebarSprintBlocks = latest.map(m => {
               const sm = (m.title || '').match(/(Sprint\s+\d+)/i);
-              const base = sm ? sm[1] : (m.title || 'Sprint');
+              const base = sm ? m[1] : (m.title || 'Sprint');
               const basePath = `Sprints/${safePath(base)}`;
-
-              // Ensure existence (already ensured above in All)
               const reviewLink = `[[${base} Review|${basePath}/Review]]`;
               const retroLink  = `[[${base} Retro|${basePath}/Retro]]`;
-
               return [
                 `- ${base}`,
                 `  - ${reviewLink}`,
@@ -261,7 +248,7 @@ jobs:
               '[[Home]]',
               '',
               '## Sprints',
-              sprintBlocks || '_No closed sprints yet_',
+              sidebarSprintBlocks || '_No closed sprints yet_',
               '',
               '---',
               '[[All Sprints|Sprints/All]]',
@@ -269,8 +256,64 @@ jobs:
               '[[Templates|Templates/README]]',
               ''
             ].join('\n');
-
             fs.writeFileSync(path.join(wikiDir, '_Sidebar.md'), sidebar, 'utf8');
+
+            // ===== Dynamic Home.md =====
+            const currentOpen = openMilestones[0] || null;       // soonest-due open
+            const latestClosed = closedMilestones[0] || null;     // most recently due closed
+
+            function sprintName(ms) {
+              const m = (ms?.title || '').match(/(Sprint\s+\d+)/i);
+              return m ? m[1] : (ms?.title || 'Sprint');
+            }
+            function sprintLinks(ms) {
+              const base = sprintName(ms);
+              const basePath = `Sprints/${safePath(base)}`;
+              return `[[Review|${basePath}/Review]] · [[Retro|${basePath}/Retro]]`;
+            }
+
+            const sections = [
+              '# Testing Project Wiki',
+              '',
+              'Welcome! This wiki tracks our Agile cadence: sprint reviews, retrospectives, and ways of working.',
+              ''];
+
+            if (currentOpen) {
+              const name = sprintName(currentOpen);
+              sections.push(
+                '## Current Sprint',
+                `**${esc(name)}**`,
+                `Due: ${fmtDate(currentOpen.due_on)}`,
+                sprintLinks(currentOpen),
+                ''
+              );
+            }
+
+            if (latestClosed) {
+              const name = sprintName(latestClosed);
+              sections.push(
+                '## Latest Sprint',
+                `**${esc(name)}**`,
+                `Closed: ${fmtDate(latestClosed.closed_at)}`,
+                sprintLinks(latestClosed),
+                ''
+              );
+            }
+
+            sections.push(
+              '---',
+              '### Quick Links',
+              '- [[All Sprints|Sprints/All]]',
+              '- [[Practices - How we work|Practices/How-we-work]]',
+              '- [[Templates|Templates/README]]',
+              '---'
+              '## What this is',
+              '- Public record of what we planned, shipped, and learned.',
+              '- Great for hiring managers: a transparent view of process and outcomes.',
+              ''
+            );
+
+            fs.writeFileSync(path.join(wikiDir, 'Home.md'), sections.join('\n'), 'utf8');
 
       - name: Commit & Push wiki changes
         run: |
@@ -278,5 +321,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "docs(wiki): update sprint pages, sidebar, and Sprints/All.md" || echo "No changes to commit."
+          git commit -m "docs(wiki): update sprint pages, sidebar, All, and dynamic Home" || echo "No changes to commit."
           git push
