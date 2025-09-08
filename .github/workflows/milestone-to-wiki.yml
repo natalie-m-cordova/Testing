@@ -1,4 +1,4 @@
-name: Milestone → Wiki (Sprint Review)
+name: Milestone → Wiki (foldered Sprints + Sidebar)
 
 on:
   milestone:
@@ -6,166 +6,208 @@ on:
   workflow_dispatch:
     inputs:
       milestone_number:
-        description: "Milestone number to export (optional if event payload present)"
+        description: "Milestone number to export (optional)"
         required: false
 
 permissions:
-  contents: write   # needed to push to the wiki repo
+  contents: write
+
+env:
+  MAX_LATEST: "3"   # set "2" if you want only the last two sprints
 
 jobs:
   export-sprint-to-wiki:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Wiki repo
         uses: actions/checkout@v4
         with:
-          # The wiki is a separate git repo: <owner>/<repo>.wiki
           repository: ${{ github.repository }}.wiki
           path: wiki
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Sprint Review page + update sidebar
+      - name: Build Sprint pages + update sidebar (foldered)
         uses: actions/github-script@v7
         env:
           WIKI_DIR: wiki
+          MAX_LATEST: ${{ env.MAX_LATEST }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const path = require('path');
-
             const wikiDir = process.env.WIKI_DIR || 'wiki';
             if (!fs.existsSync(wikiDir)) fs.mkdirSync(wikiDir, { recursive: true });
 
             const { owner, repo } = context.repo;
 
-            // 1) Determine milestone number
+            // helpers
+            const fmtDate = (s) => s ? new Date(s).toISOString().slice(0,10) : '—';
+            const esc = (s) => String(s || '').replace(/\r?\n/g, ' ').trim();
+            const mkdirp = (p) => fs.mkdirSync(p, { recursive: true });
+            const writeIfMissing = (file, content) => { if (!fs.existsSync(file)) fs.writeFileSync(file, content, 'utf8'); };
+
+            // Keep slashes for folder structure, sanitize other chars
+            const safePath = (title) => String(title).replace(/[<>:"|?*]/g, '-').replace(/\s+/g, ' ').trim();
+
+            // Determine which milestone to export
             let milestoneNumber = core.getInput('milestone_number');
             if (!milestoneNumber && context.payload?.milestone?.number) {
               milestoneNumber = String(context.payload.milestone.number);
             }
-            if (!milestoneNumber) {
-              // Fallback: pick most recently closed milestone
-              const closed = await github.paginate(
-                github.rest.issues.listMilestones,
-                { owner, repo, state: 'closed', sort: 'due_on', direction: 'desc', per_page: 100 }
-              );
-              if (!closed.length) {
-                core.info('No closed milestones found; nothing to write.');
-                return;
-              }
-              milestoneNumber = String(closed[0].number);
-            }
-            const num = parseInt(milestoneNumber, 10);
 
-            // 2) Fetch milestone details
-            const { data: ms } = await github.rest.issues.getMilestone({
-              owner, repo, milestone_number: num
-            });
-
-            // 3) Fetch issues in milestone (all states)
-            const allIssues = await github.paginate(
-              github.rest.issues.listForRepo,
-              { owner, repo, state: 'all', milestone: num, per_page: 100 }
-            );
-            const onlyIssues = allIssues.filter(i => !i.pull_request); // exclude PRs (optional)
-            const done = onlyIssues.filter(i => i.state === 'closed');
-            const todo = onlyIssues.filter(i => i.state !== 'closed');
-
-            // Helpers
-            const fmtDate = (s) => s ? new Date(s).toISOString().slice(0,10) : '—';
-            const esc = (s) => String(s || '').replace(/\r?\n/g, ' ').trim();
-            const linkIssue = (x) => `- [#${x.number}](${x.html_url}) ${x.title}`;
-
-            // 4) Derive sprint page name from milestone title
-            // Expecting titles like "Sprint 1 – <something>". If not, still use the title.
-            let sprintName = 'Sprint Review';
-            const sprintMatch = (ms.title || '').match(/(Sprint\s+\d+)/i);
-            if (sprintMatch) sprintName = `${sprintMatch[1]} Review`;
-            else sprintName = `${ms.title} Review`;
-
-            const pageFile = path.join(wikiDir, `${sprintName.replace(/\//g, '-')}.md`);
-
-            // 5) Compose page content
-            const overviewLines = [
-              `# ${sprintName}`,
-              '',
-              `**Milestone:** [${esc(ms.title)}](${ms.html_url})`,
-              `**State:** ${ms.state}`,
-              `**Due:** ${fmtDate(ms.due_on)}  |  **Closed:** ${fmtDate(ms.closed_at)}`,
-              `**Issues:** ${onlyIssues.length} total — ${done.length} closed / ${todo.length} open`,
-              '',
-              '---',
-              '## Outcomes',
-              `- See all issues in the milestone → [${esc(ms.title)}](${ms.html_url})`,
-              '',
-              '### Completed',
-              done.length ? done.map(linkIssue).join('\n') : '_None_',
-              '',
-              '### Not Completed',
-              todo.length ? todo.map(linkIssue).join('\n') : '_None_',
-              '',
-              '---',
-              '## Review Notes',
-              '- Highlights: _fill in_',
-              '- Demos: _links/screenshots_',
-              '',
-              '## Retrospective (optional)',
-              '- What went well: _fill in_',
-              '- What can improve: _fill in_',
-              '- Actions: _fill in_',
-              '',
-              '---',
-              '## Links',
-              `- Milestone: ${ms.html_url}`,
-              `- Repository: https://github.com/${owner}/${repo}`,
-              ''
-            ].join('\n');
-
-            // Ensure Home.md exists once
-            const homeMd = path.join(wikiDir, 'Home.md');
-            if (!fs.existsSync(homeMd)) {
-              const home = [
-                '# Project Wiki',
-                '',
-                `Welcome to the ${repo} Wiki.`,
-                '',
-                'See recent Sprints in the sidebar.',
-                ''
-              ].join('\n');
-              fs.writeFileSync(homeMd, home, 'utf8');
-            }
-
-            // Write/Update sprint page
-            fs.writeFileSync(pageFile, overviewLines, 'utf8');
-            core.info(`Wrote wiki page: ${pageFile}`);
-
-            // 6) Rebuild _Sidebar.md with latest 3 closed sprints
-            const closed = await github.paginate(
+            const closedMilestones = await github.paginate(
               github.rest.issues.listMilestones,
               { owner, repo, state: 'closed', sort: 'due_on', direction: 'desc', per_page: 100 }
             );
+            const openMilestones = await github.paginate(
+              github.rest.issues.listMilestones,
+              { owner, repo, state: 'open', sort: 'due_on', direction: 'asc', per_page: 100 }
+            );
 
-            // Map closed milestones to their Sprint N (or raw title) and page name
-            const entries = closed.slice(0, 3).map(m => {
-              const mMatch = (m.title || '').match(/(Sprint\s+\d+)/i);
-              const title = mMatch ? `${mMatch[1]} Review` : `${m.title} Review`;
-              const fileName = `${title.replace(/\//g, '-')}.md`; // wiki page file
-              return { title, fileName };
-            });
+            if (!milestoneNumber) {
+              if (closedMilestones.length > 0) milestoneNumber = String(closedMilestones[0].number);
+              else if (openMilestones.length > 0) milestoneNumber = String(openMilestones[0].number);
+            }
+
+            async function writeSprintReview(msNumber) {
+              const { data: ms } = await github.rest.issues.getMilestone({ owner, repo, milestone_number: msNumber });
+
+              // Gather issues (exclude PRs)
+              const allItems = await github.paginate(
+                github.rest.issues.listForRepo,
+                { owner, repo, state: 'all', milestone: msNumber, per_page: 100 }
+              );
+              const onlyIssues = allItems.filter(i => !i.pull_request);
+              const done = onlyIssues.filter(i => i.state === 'closed');
+              const todo = onlyIssues.filter(i => i.state !== 'closed');
+              const linkIssue = (x) => `- [#${x.number}](${x.html_url}) ${x.title}`;
+
+              // Sprint name
+              const m = (ms.title || '').match(/(Sprint\s+\d+)/i);
+              const sprintBase = m ? m[1] : (ms.title || 'Sprint');
+
+              // Foldered location: wiki/Sprints/<Sprint N>/
+              const sprintFolder = path.join(wikiDir, 'Sprints', safePath(sprintBase));
+              mkdirp(sprintFolder);
+
+              // Review page
+              const reviewFile = path.join(sprintFolder, 'Review.md');
+              const reviewMd = [
+                `# ${sprintBase} Review`,
+                '',
+                `**Milestone:** [${esc(ms.title)}](${ms.html_url})`,
+                `**State:** ${ms.state}`,
+                `**Due:** ${fmtDate(ms.due_on)}  |  **Closed:** ${fmtDate(ms.closed_at)}`,
+                `**Issues:** ${onlyIssues.length} total — ${done.length} closed / ${todo.length} open`,
+                '',
+                '---',
+                '## Outcomes',
+                `- All issues: [${esc(ms.title)}](${ms.html_url})`,
+                '',
+                '### Completed',
+                done.length ? done.map(linkIssue).join('\n') : '_None_',
+                '',
+                '### Not Completed',
+                todo.length ? todo.map(linkIssue).join('\n') : '_None_',
+                '',
+                '---',
+                '## Review Notes',
+                '- Highlights: _fill in_',
+                '- Demos: _links/screenshots_',
+                '',
+                '## Retrospective (optional)',
+                '- See the Retro page for this sprint.',
+                '',
+                '---',
+                '## Links',
+                `- Milestone: ${ms.html_url}`,
+                `- Repository: https://github.com/${owner}/${repo}`,
+                ''
+              ].join('\n');
+              fs.writeFileSync(reviewFile, reviewMd, 'utf8');
+
+              // Retro page scaffold
+              const retroFile = path.join(sprintFolder, 'Retro.md');
+              writeIfMissing(retroFile, [
+                `# ${sprintBase} Retro`,
+                '',
+                '## What went well',
+                '- ',
+                '',
+                '## What could be improved',
+                '- ',
+                '',
+                '## Action items',
+                '- ',
+                ''
+              ].join('\n'));
+            }
+
+            if (milestoneNumber) {
+              try { await writeSprintReview(parseInt(milestoneNumber, 10)); }
+              catch (e) { core.warning(`Could not write selected milestone #${milestoneNumber}: ${e.message}`); }
+            }
+
+            // Ensure Home and static pages exist
+            writeIfMissing(path.join(wikiDir, 'Home.md'),
+              '# Project Wiki\n\nWelcome to the Wiki. Use the sidebar to navigate recent sprints and practices.\n');
+
+            // Sprints/All.md
+            const allSprintsFile = path.join(wikiDir, 'Sprints', 'All.md');
+            mkdirp(path.dirname(allSprintsFile));
+            writeIfMissing(allSprintsFile, '# All Sprints\n\nLinks to every sprint (add/automate as needed).\n');
+
+            // Practices/How-we-work.md
+            const practicesFile = path.join(wikiDir, 'Practices', 'How-we-work.md');
+            mkdirp(path.dirname(practicesFile));
+            writeIfMissing(practicesFile,
+              '# Practices – How we work\n\n- Definition of Done\n- Branching strategy\n- Estimation scale\n');
+
+            // Templates/README.md
+            const templatesFile = path.join(wikiDir, 'Templates', 'README.md');
+            mkdirp(path.dirname(templatesFile));
+            writeIfMissing(templatesFile,
+              '# Templates\n\n- Sprint Review template\n- Sprint Retro template\n');
+
+            // Build sidebar with latest N closed sprints
+            const maxLatest = parseInt(process.env.MAX_LATEST || '3', 10);
+            const latest = closedMilestones.slice(0, maxLatest);
+
+            const sprintBlocks = latest.map(m => {
+              const sm = (m.title || '').match(/(Sprint\s+\d+)/i);
+              const base = sm ? sm[1] : (m.title || 'Sprint');
+              const basePath = `Sprints/${safePath(base)}`;
+              const reviewLink = `[[${base} Review|${basePath}/Review]]`;
+              const retroLink  = `[[${base} Retro|${basePath}/Retro]]`;
+
+              // ensure folders/pages exist for sidebar-listed sprints
+              const sprintFolder = path.join(wikiDir, basePath);
+              mkdirp(sprintFolder);
+              writeIfMissing(path.join(sprintFolder, 'Review.md'), `# ${base} Review\n\n_(coming soon)_\n`);
+              writeIfMissing(path.join(sprintFolder, 'Retro.md'),  `# ${base} Retro\n\n_(coming soon)_\n`);
+
+              return [
+                `- ${base}`,
+                `  - ${reviewLink}`,
+                `  - ${retroLink}`
+              ].join('\n');
+            }).join('\n');
 
             const sidebar = [
               '[[Home]]',
               '',
               '## Sprints',
-              ...entries.map(e => `- [[${e.title}|${e.fileName.replace(/\.md$/,'')}]]`),
+              sprintBlocks || '_No closed sprints yet_',
+              '',
+              '---',
+              '[[All Sprints|Sprints/All]]',
+              '[[Practices - How we work|Practices/How-we-work]]',
+              '[[Templates|Templates/README]]',
               ''
             ].join('\n');
 
-            const sidebarFile = path.join(wikiDir, '_Sidebar.md');
-            fs.writeFileSync(sidebarFile, sidebar, 'utf8');
-            core.info(`Updated sidebar: ${sidebarFile}`);
+            fs.writeFileSync(path.join(wikiDir, '_Sidebar.md'), sidebar, 'utf8');
 
       - name: Commit & Push wiki changes
         run: |
@@ -173,5 +215,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "docs(wiki): ${GITHUB_REF_NAME:-main} – Sprint Review export" || echo "No changes to commit."
+          git commit -m "docs(wiki): foldered sprint pages and sidebar" || echo "No changes to commit."
           git push
