@@ -166,8 +166,8 @@ jobs:
 
             // Build/refresh "All Sprints" page listing all milestones
             const allMilestones = [
-              ...closedMilestones.map(m => ({ ...m, _stateOrder: 0 })), // closed first (we'll render in desc due)
-              ...openMilestones.map(m => ({ ...m, _stateOrder: 1 }))    // then open (asc due)
+              ...closedMilestones.map(m => ({ ...m, _stateOrder: 0 })), // closed first
+              ...openMilestones.map(m => ({ ...m, _stateOrder: 1 }))    // then open
             ];
 
             const rows = allMilestones.map(m => {
@@ -227,7 +227,7 @@ jobs:
             mkdirp(path.dirname(allSprintsFile));
             fs.writeFileSync(allSprintsFile, allMd, 'utf8');
 
-            // Sidebar with latest N closed sprints
+            // Sidebar with latest N closed sprints (Review/Retro only for CLOSED)
             const maxLatest = parseInt(process.env.MAX_LATEST || '3', 10);
             const latest = closedMilestones.slice(0, maxLatest);
 
@@ -260,13 +260,14 @@ jobs:
 
             // ===== Dynamic Home.md =====
             const currentOpen = openMilestones[0] || null;       // soonest-due open
-            const latestClosed = closedMilestones[0] || null;     // most recently due closed
+            const latestClosed = closedMilestones[0] || null;     // most recent closed
 
             function sprintName(ms) {
               const m = (ms?.title || '').match(/(Sprint\s+\d+)/i);
               return m ? m[1] : (ms?.title || 'Sprint');
             }
             function sprintLinks(ms) {
+              // Only used for closed sprints
               const base = sprintName(ms);
               const basePath = `Sprints/${safePath(base)}`;
               return `[[Review|${basePath}/Review]] · [[Retro|${basePath}/Retro]]`;
@@ -276,19 +277,22 @@ jobs:
               '# Testing Project Wiki',
               '',
               'Welcome! This wiki tracks our Agile cadence: sprint reviews, retrospectives, and ways of working.',
-              ''];
+              ''
+            ];
 
+            // Current sprint: NO Review/Retro links — just due date + milestone
             if (currentOpen) {
               const name = sprintName(currentOpen);
               sections.push(
                 '## Current Sprint',
                 `**${esc(name)}**`,
                 `Due: ${fmtDate(currentOpen.due_on)}`,
-                sprintLinks(currentOpen),
+                `Milestone: [${esc(currentOpen.title)}](${currentOpen.html_url})`,
                 ''
               );
             }
 
+            // Latest closed sprint: include Review/Retro links
             if (latestClosed) {
               const name = sprintName(latestClosed);
               sections.push(
@@ -306,7 +310,7 @@ jobs:
               '- [[All Sprints|Sprints/All]]',
               '- [[Practices - How we work|Practices/How-we-work]]',
               '- [[Templates|Templates/README]]',
-              '---'
+              '---',
               '## What this is',
               '- Public record of what we planned, shipped, and learned.',
               '- Great for hiring managers: a transparent view of process and outcomes.',
