@@ -7,7 +7,7 @@ Thank you for your interest in contributing to the **Testing** project! We welco
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 78 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 80 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 
