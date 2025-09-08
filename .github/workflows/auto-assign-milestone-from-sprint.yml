@@ -1,0 +1,121 @@
+name: Auto-assign Milestone from Sprint Label
+
+on:
+  issues:
+    types: [opened, labeled, edited, reopened, unlabeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to assign (optional; defaults to the event issue)'
+        required: false
+      sprint:
+        description: 'Sprint label override (e.g., "Sprint 2")'
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  assign-milestone:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine sprint from labels or input
+        id: find
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            // Inputs (workflow_dispatch can override)
+            const inputSprint = core.getInput('sprint')?.trim();
+            let sprintLabel = inputSprint || '';
+            let issueNumber = core.getInput('issue_number')?.trim();
+
+            const { owner, repo } = context.repo;
+
+            // Determine issue number from event if not provided
+            if (!issueNumber) {
+              issueNumber = context.payload.issue?.number;
+            }
+            if (!issueNumber) {
+              core.setFailed('No issue number available. Provide via dispatch input or trigger on an issue event.');
+              return;
+            }
+
+            // Determine sprint label from issue labels if not provided
+            if (!sprintLabel) {
+              const labels = (context.payload.issue?.labels || []).map(l => typeof l === 'string' ? l : l.name);
+              // collect all "Sprint N" hits, choose highest N if multiple
+              const nums = labels.map(name => {
+                // match "Sprint 1", "Sprint 1 – Planned", etc.
+                const m = name.match(/^Sprint\s+(\d+)\b/i);
+                return m ? Number(m[1]) : null;
+              }).filter(n => Number.isInteger(n));
+              if (nums.length === 0) {
+                core.setOutput('issue', String(issueNumber));
+                core.setOutput('sprint', '');
+                return;
+              }
+              const n = Math.max(...nums);
+              sprintLabel = `Sprint ${n}`;
+            }
+
+            core.setOutput('issue', String(issueNumber));
+            core.setOutput('sprint', sprintLabel);
+
+      - name: Stop if no Sprint label found
+        if: steps.find.outputs.sprint == ''
+        run: echo "No 'Sprint N' label present; skipping."
+
+      - name: Assign matching milestone
+        if: steps.find.outputs.sprint != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = parseInt('${{ steps.find.outputs.issue }}', 10);
+            const sprintLabel = '${{ steps.find.outputs.sprint }}';
+            const { owner, repo } = context.repo;
+
+            // Get current issue (to check existing milestone)
+            const issue = (await github.rest.issues.get({ owner, repo, issue_number: issueNumber })).data;
+            const currentMilestone = issue.milestone?.title || null;
+
+            // Helper to list milestones by state
+            async function listMilestones(state) {
+              return github.paginate(github.rest.issues.listMilestones, {
+                owner, repo, state, sort: 'due_on', direction: 'asc', per_page: 100
+              });
+            }
+
+            // Fetch open first (preferred), then closed
+            const open = await listMilestones('open');
+            const closed = await listMilestones('closed');
+            const all = [...open, ...closed];
+
+            // Match titles that BEGIN with "Sprint N" (case-insensitive), e.g.
+            // "Sprint 2", "Sprint 2 – Planned", "Sprint 2 - Anything"
+            const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`^${esc(sprintLabel)}\\b`, 'i');
+            const candidates = all.filter(m => re.test(m.title));
+
+            if (candidates.length === 0) {
+              core.setFailed(`No milestone found whose title starts with "${sprintLabel}".`);
+              return;
+            }
+
+            // Prefer an OPEN milestone; otherwise take the first candidate (earliest due_on)
+            const chosen = candidates.find(m => m.state === 'open') || candidates[0];
+
+            if (currentMilestone === chosen.title) {
+              core.info(`Issue #${issueNumber} is already in milestone "${chosen.title}" (#${chosen.number}).`);
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner, repo, issue_number: issueNumber, milestone: chosen.number
+            });
+
+            core.info(`✅ Assigned issue #${issueNumber} to milestone "${chosen.title}" (#${chosen.number}).`)
