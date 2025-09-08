@@ -1,0 +1,172 @@
+name: Assign Iteration from Sprint Label
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  set-iteration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse Sprint label
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find a label like "Sprint 2"
+            const labels = (context.payload.issue?.labels || []).map(l => (typeof l === 'string' ? l : l.name) || '');
+            const match = labels.map(s => s.match(/^sprint\s*(\d+)$/i)).find(Boolean);
+            if (!match) {
+              core.info('No Sprint N label found; skipping.');
+              core.setOutput('sprint', '');
+              return;
+            }
+            core.setOutput('sprint', `Sprint ${match[1]}`);
+
+      - name: Stop if no Sprint label
+        if: steps.parse.outputs.sprint == ''
+        run: echo "No matching Sprint label; nothing to do."
+
+      - name: Assign Iteration on Project
+        if: steps.parse.outputs.sprint != ''
+        uses: actions/github-script@v7
+        env:
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+          SPRINT_FIELD_NAME: ${{ vars.SPRINT_FIELD_NAME }}
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          script: |
+            const sprintTitle = core.getInput('sprint', { required: false }) || process.env.SPRINT; // not used; kept for clarity
+            const sprintLabel = '${{ steps.parse.outputs.sprint }}'; // e.g., "Sprint 2"
+            const projectNumberRaw = process.env.PROJECT_NUMBER;
+            if (!projectNumberRaw) {
+              core.setFailed('Missing repo variable PROJECT_NUMBER (set it under Settings → Secrets and variables → Variables).');
+              return;
+            }
+            const projectNumber = parseInt(projectNumberRaw, 10);
+            const iterationFieldName = (process.env.SPRINT_FIELD_NAME || 'Sprints').trim();
+
+            const { owner, repo } = context.repo;
+            const issueNumber = context.payload.issue.number;
+
+            // 1) Look up owner type and project by number
+            const qProj = `
+              query($owner:String!, $number:Int!) {
+                org: organization(login:$owner) {
+                  projectV2(number:$number) {
+                    id
+                    fields(first:50) {
+                      nodes {
+                        ... on ProjectV2FieldCommon { id name }
+                        ... on ProjectV2IterationField {
+                          id
+                          name
+                          configuration { iterations { id title } }
+                        }
+                      }
+                    }
+                  }
+                }
+                usr: user(login:$owner) {
+                  projectV2(number:$number) {
+                    id
+                    fields(first:50) {
+                      nodes {
+                        ... on ProjectV2FieldCommon { id name }
+                        ... on ProjectV2IterationField {
+                          id
+                          name
+                          configuration { iterations { id title } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            const dataProj = await github.graphql(qProj, { owner, number: projectNumber });
+            const project = (dataProj.org?.projectV2) || (dataProj.usr?.projectV2);
+            if (!project?.id) {
+              core.setFailed(`Project number ${projectNumber} not found under ${owner}. Check PROJECT_NUMBER and visibility/SSO.`);
+              return;
+            }
+
+            // 2) Find the Iteration field named "Sprints" (or override)
+            const fields = project.fields?.nodes || [];
+            const iterField = fields.find(f => f.__typename === 'ProjectV2IterationField' && f.name === iterationFieldName);
+            if (!iterField) {
+              core.setFailed(`Iteration field "${iterationFieldName}" not found. Create an Iteration field with that exact name.`);
+              return;
+            }
+
+            // 3) Find the iteration value whose title matches the label (e.g., "Sprint 2")
+            const iterations = iterField.configuration?.iterations || [];
+            const targetIter = iterations.find(it => (it.title || '').trim().toLowerCase() === sprintLabel.toLowerCase());
+            if (!targetIter) {
+              const titles = iterations.map(i => i.title).join(', ');
+              core.setFailed(`Iteration value "${sprintLabel}" not found in field "${iterationFieldName}". Available: ${titles}`);
+              return;
+            }
+
+            // 4) Get Issue node id and check if it's already in the project
+            const qIssue = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  issue(number:$number) {
+                    id
+                    projectItems(first:50) {
+                      nodes { id project { id } }
+                    }
+                  }
+                }
+              }`;
+            const dIssue = await github.graphql(qIssue, { owner, repo, number: issueNumber });
+            const issue = dIssue.repository?.issue;
+            if (!issue?.id) {
+              core.setFailed(`Issue #${issueNumber} not found.`);
+              return;
+            }
+            let itemId = issue.projectItems?.nodes?.find(n => n.project?.id === project.id)?.id || null;
+
+            // 5) If not in project, add it
+            if (!itemId) {
+              const mutAdd = `
+                mutation($projectId:ID!, $contentId:ID!) {
+                  addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
+                    item { id }
+                  }
+                }`;
+              const addRes = await github.graphql(mutAdd, { projectId: project.id, contentId: issue.id });
+              itemId = addRes.addProjectV2ItemById?.item?.id;
+              if (!itemId) {
+                core.setFailed('Failed to add issue to project.');
+                return;
+              }
+            }
+
+            // 6) Update the Iteration field value
+            const mutUpdate = `
+              mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $iterId:String!) {
+                updateProjectV2ItemFieldValue(input:{
+                  projectId:$projectId,
+                  itemId:$itemId,
+                  fieldId:$fieldId,
+                  value:{ iterationId:$iterId }
+                }) {
+                  projectV2Item { id }
+                }
+              }`;
+            await github.graphql(mutUpdate, {
+              projectId: project.id,
+              itemId,
+              fieldId: iterField.id,
+              iterId: targetIter.id
+            });
+
+            core.info(`Set Iteration "${sprintLabel}" on Issue #${issueNumber} (${owner}/${repo}) in Project #${projectNumber}.`);
