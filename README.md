@@ -10,6 +10,7 @@
   <img alt="Contributors" src="https://img.shields.io/github/contributors/NMRCDova/Testing">
   <!-- SPRINT BADGE START -->![Sprint](https://img.shields.io/badge/Sprint-1--In--Progress-blue)<!-- SPRINT BADGE END -->
   <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-lightgrey">
+  <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-blue">
 </p>
 
 ## Project Overview
@@ -66,7 +67,6 @@ This repository is maintained as a practice ground for GitHub usage and open-sou
 
 ## Sprint Notes (Wiki)
 
-[![wiki](https://img.shields.io/badge/wiki-available-blue)](../../wiki)
 - **Latest Review:** [Sprint 1 Review](../../wiki/Sprints/Sprint-1-Review)
 - **Latest Retro:** [Sprint 1 Retrospective](../../wiki/Sprints/Sprint-1-Retrospective)
 - **How We Work:** [Practices](../../wiki/Practices/How-We-Work)
