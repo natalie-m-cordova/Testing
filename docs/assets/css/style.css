@@ -48,3 +48,4 @@ footer{margin-top:auto; border-top:1px solid var(--border); padding:24px 0; colo
 .btn{display:inline-block; padding:10px 14px; border-radius:12px; text-decoration:none; color:#fff; background:linear-gradient(135deg,var(--brand),var(--accent)); box-shadow:var(--shadow)}
 .center{display:flex; justify-content:center; align-items:center; text-align:center}
 hr{border:0; border-top:1px solid var(--border); margin:28px 0}
+.nav-links {margin-left: auto; display: flex; gap: 6px}
