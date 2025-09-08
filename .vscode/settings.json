@@ -10,5 +10,6 @@
   },
   "yaml.lint.ignore": [
     "secrets.ORG_GRAPHQL_TOKEN"
-  ]
+  ],
+  "cspHtmlLinter.allowStyleTagWithoutNonce": true
 }
