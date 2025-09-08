@@ -1,4 +1,4 @@
-name: Milestone → Wiki (foldered Sprints + Sidebar + All page + Dynamic Home)
+name: Milestone → Wiki (Flat pages + Closed only + Sidebar + All + Dynamic Home)
 
 on:
   milestone:
@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  MAX_LATEST: "3"   # set "2" to keep only two latest closed sprints in the sidebar
+  MAX_LATEST: "3"   # keep latest N closed sprints in the sidebar
 
 jobs:
   export-sprint-to-wiki:
@@ -26,7 +26,7 @@ jobs:
           path: wiki
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Sprint pages + update sidebar + All page + Home
+      - name: Build Sprint pages (closed-only) + Sidebar + All + Home
         uses: actions/github-script@v7
         env:
           WIKI_DIR: wiki
@@ -45,12 +45,12 @@ jobs:
             const fmtDate = (s) => s ? new Date(s).toISOString().slice(0,10) : '—';
             const esc = (s) => String(s || '').replace(/\r?\n/g, ' ').trim();
             const mkdirp = (p) => fs.mkdirSync(p, { recursive: true });
-            const safePath = (title) => String(title).replace(/[<>:"|?*]/g, '-').replace(/\s+/g, ' ').trim();
+            const cleanTitle = (title) => String(title).trim(); // exact page title for wiki [[Title]]
 
-            // Which milestone to write full Review for (optional override)
-            let milestoneNumber = core.getInput('milestone_number');
-            if (!milestoneNumber && context.payload?.milestone?.number) {
-              milestoneNumber = String(context.payload.milestone.number);
+            // Optional target milestone (only used if it's CLOSED; we never generate open pages)
+            let milestoneNumberInput = core.getInput('milestone_number');
+            if (!milestoneNumberInput && context.payload?.milestone?.number) {
+              milestoneNumberInput = String(context.payload.milestone.number);
             }
 
             // Fetch milestones
@@ -63,13 +63,20 @@ jobs:
               { owner, repo, state: 'open', sort: 'due_on', direction: 'asc', per_page: 100 }
             );
 
-            if (!milestoneNumber) {
-              if (closedMilestones.length > 0) milestoneNumber = String(closedMilestones[0].number);
-              else if (openMilestones.length > 0) milestoneNumber = String(openMilestones[0].number);
-            }
+            // Given a milestone, compute "Sprint N" or fallback
+            const sprintName = (ms) => {
+              const m = (ms?.title || '').match(/(Sprint\s+\d+)/i);
+              return m ? m[1] : (ms?.title || 'Sprint');
+            };
 
-            async function writeSprintReview(msNumber) {
-              const { data: ms } = await github.rest.issues.getMilestone({ owner, repo, milestone_number: msNumber });
+            // Flat page titles (no folders)
+            const reviewPageTitle = (base) => cleanTitle(`${base} - Review`);
+            const retroPageTitle  = (base) => cleanTitle(`${base} - Retro`);
+
+            // Write a closed sprint's Review (+ create Retro scaffold if missing)
+            async function writeClosedSprint(ms) {
+              const msNumber = ms.number;
+              const base = sprintName(ms);
 
               // Gather issues (exclude PRs)
               const allItems = await github.paginate(
@@ -81,18 +88,11 @@ jobs:
               const todo = onlyIssues.filter(i => i.state !== 'closed');
               const linkIssue = (x) => `- [#${x.number}](${x.html_url}) ${x.title}`;
 
-              // Sprint name (prefer "Sprint N", else full title)
-              const m = (ms.title || '').match(/(Sprint\s+\d+)/i);
-              const sprintBase = m ? m[1] : (ms.title || 'Sprint');
-
-              // Foldered location: wiki/Sprints/<Sprint N>/
-              const sprintFolder = path.join(wikiDir, 'Sprints', safePath(sprintBase));
-              mkdirp(sprintFolder);
-
-              // Review page (full)
-              const reviewFile = path.join(sprintFolder, 'Review.md');
+              // Review page
+              const reviewTitle = reviewPageTitle(base);
+              const reviewPath  = path.join(wikiDir, `${reviewTitle}.md`);
               const reviewMd = [
-                `# ${sprintBase} Review`,
+                `# ${base} Review`,
                 '',
                 `**Milestone:** [${esc(ms.title)}](${ms.html_url})`,
                 `**State:** ${ms.state}`,
@@ -115,7 +115,7 @@ jobs:
                 '- Demos: _links/screenshots_',
                 '',
                 '## Retrospective (optional)',
-                `- See [[${sprintBase} Retro|Sprints/${safePath(sprintBase)}/Retro]].`,
+                `- See [[${retroPageTitle(base)}]].`,
                 '',
                 '---',
                 '## Links',
@@ -123,13 +123,14 @@ jobs:
                 `- Repository: https://github.com/${owner}/${repo}`,
                 ''
               ].join('\n');
-              fs.writeFileSync(reviewFile, reviewMd, 'utf8');
+              fs.writeFileSync(reviewPath, reviewMd, 'utf8');
 
-              // Retro page scaffold (keep existing if present)
-              const retroFile = path.join(sprintFolder, 'Retro.md');
-              if (!fs.existsSync(retroFile)) {
-                fs.writeFileSync(retroFile, [
-                  `# ${sprintBase} Retro`,
+              // Retro scaffold (keep existing if present)
+              const retroTitle = retroPageTitle(base);
+              const retroPath  = path.join(wikiDir, `${retroTitle}.md`);
+              if (!fs.existsSync(retroPath)) {
+                fs.writeFileSync(retroPath, [
+                  `# ${base} Retro`,
                   '',
                   '## What went well',
                   '- ',
@@ -144,103 +145,78 @@ jobs:
               }
             }
 
-            // Write selected sprint's Review as full content
-            if (milestoneNumber) {
-              try { await writeSprintReview(parseInt(milestoneNumber, 10)); }
-              catch (e) { core.warning(`Could not write selected milestone #${milestoneNumber}: ${e.message}`); }
+            // If a specific milestone was given, only write it if it's CLOSED; otherwise skip
+            if (milestoneNumberInput) {
+              const { data: ms } = await github.rest.issues.getMilestone({ owner, repo, milestone_number: parseInt(milestoneNumberInput, 10) });
+              if (ms.state === 'closed') {
+                await writeClosedSprint(ms);
+              } else {
+                core.info(`Milestone #${ms.number} is not closed; no pages generated.`);
+              }
             }
 
-            // Ensure Practices and Templates exist
-            const practicesFile = path.join(wikiDir, 'Practices', 'How-we-work.md');
-            mkdirp(path.dirname(practicesFile));
-            if (!fs.existsSync(practicesFile)) {
-              fs.writeFileSync(practicesFile,
+            // Always ensure these exist
+            const practicesPath = path.join(wikiDir, 'Practices - How we work.md');
+            if (!fs.existsSync(practicesPath)) {
+              fs.writeFileSync(practicesPath,
                 '# Practices – How we work\n\n- Definition of Done\n- Branching strategy\n- Estimation scale\n', 'utf8');
             }
-            const templatesFile = path.join(wikiDir, 'Templates', 'README.md');
-            mkdirp(path.dirname(templatesFile));
-            if (!fs.existsSync(templatesFile)) {
-              fs.writeFileSync(templatesFile,
+            const templatesPath = path.join(wikiDir, 'Templates - README.md');
+            if (!fs.existsSync(templatesPath)) {
+              fs.writeFileSync(templatesPath,
                 '# Templates\n\n- Sprint Review template\n- Sprint Retro template\n', 'utf8');
             }
 
-            // Build/refresh "All Sprints" page listing all milestones
-            const allMilestones = [
-              ...closedMilestones.map(m => ({ ...m, _stateOrder: 0 })), // closed first
-              ...openMilestones.map(m => ({ ...m, _stateOrder: 1 }))    // then open
-            ];
+            // Generate/refresh pages for all CLOSED milestones (so table/links always resolve)
+            for (const ms of closedMilestones) {
+              await writeClosedSprint(ms);
+            }
 
-            const rows = allMilestones.map(m => {
-              const sm = (m.title || '').match(/(Sprint\s+\d+)/i);
-              const base = sm ? sm[1] : (m.title || 'Sprint');
-              const basePath = `Sprints/${safePath(base)}`;
-              const sprintFolder = path.join(wikiDir, basePath);
-              mkdirp(sprintFolder);
-
-              const reviewPath = path.join(sprintFolder, 'Review.md');
-              if (!fs.existsSync(reviewPath)) {
-                fs.writeFileSync(reviewPath, `# ${base} Review\n\n_(coming soon)_\n`, 'utf8');
-              }
-              const retroPath = path.join(sprintFolder, 'Retro.md');
-              if (!fs.existsSync(retroPath)) {
-                fs.writeFileSync(retroPath, `# ${base} Retro\n\n_(coming soon)_\n`, 'utf8');
-              }
-
-              const due = fmtDate(m.due_on);
-              const closed = fmtDate(m.closed_at);
-              const statePretty = m.state === 'closed' ? 'Closed' : 'Open';
-              const reviewLink = `[[Review|${basePath}/Review]]`;
-              const retroLink  = `[[Retro|${basePath}/Retro]]`;
-
-              return {
-                isClosed: m.state === 'closed',
-                dueOn: m.due_on || '',
-                md: `| [[${base}|${basePath}]] | ${statePretty} | ${due} | ${closed} | ${reviewLink} · ${retroLink} |`
-              };
+            // All Sprints page
+            const closedRows = closedMilestones.map(ms => {
+              const base = sprintName(ms);
+              const review = reviewPageTitle(base);
+              const retro  = retroPageTitle(base);
+              return `| ${base} | Closed | ${fmtDate(ms.due_on)} | ${fmtDate(ms.closed_at)} | [[${review}]] · [[${retro}]] |`;
             });
 
-            const closedRows = rows.filter(r => r.isClosed)
-              .sort((a,b) => (a.dueOn < b.dueOn ? 1 : -1));
-            const openRows   = rows.filter(r => !r.isClosed)
-              .sort((a,b) => (a.dueOn < b.dueOn ? -1 : 1));
+            const openRows = openMilestones.map(ms => {
+              const base = sprintName(ms);
+              return `| ${base} | Open | ${fmtDate(ms.due_on)} | — | [Milestone](${ms.html_url}) |`;
+            });
 
             const allMd = [
               '# All Sprints',
               '',
-              'A consolidated index of all sprints. Columns show current state, due/closed dates, and quick links.',
+              'A consolidated index of all sprints. Closed sprints link to Review/Retro. Open sprints show milestone only.',
               '',
               '## Closed',
               '',
               '| Sprint | State | Due | Closed | Links |',
               '|---|---|---|---|---|',
-              closedRows.length ? closedRows.map(r => r.md).join('\n') : '| _None_ |  |  |  |  |',
+              closedRows.length ? closedRows.join('\n') : '| _None_ |  |  |  |  |',
               '',
               '## Open',
               '',
               '| Sprint | State | Due | Closed | Links |',
               '|---|---|---|---|---|',
-              openRows.length ? openRows.map(r => r.md).join('\n') : '| _None_ |  |  |  |  |',
+              openRows.length ? openRows.join('\n') : '| _None_ |  |  |  |  |',
               ''
             ].join('\n');
 
-            const allSprintsFile = path.join(wikiDir, 'Sprints', 'All.md');
-            mkdirp(path.dirname(allSprintsFile));
-            fs.writeFileSync(allSprintsFile, allMd, 'utf8');
+            fs.writeFileSync(path.join(wikiDir, 'Sprints - All.md'), allMd, 'utf8');
 
-            // Sidebar with latest N closed sprints (Review/Retro only for CLOSED)
+            // Sidebar: latest N closed only
             const maxLatest = parseInt(process.env.MAX_LATEST || '3', 10);
-            const latest = closedMilestones.slice(0, maxLatest);
-
-            const sidebarSprintBlocks = latest.map(m => {
-              const sm = (m.title || '').match(/(Sprint\s+\d+)/i);
-              const base = sm ? m[1] : (m.title || 'Sprint');
-              const basePath = `Sprints/${safePath(base)}`;
-              const reviewLink = `[[${base} Review|${basePath}/Review]]`;
-              const retroLink  = `[[${base} Retro|${basePath}/Retro]]`;
+            const latestClosed = closedMilestones.slice(0, maxLatest);
+            const sidebarBlocks = latestClosed.map(ms => {
+              const base = sprintName(ms);
+              const review = reviewPageTitle(base);
+              const retro  = retroPageTitle(base);
               return [
                 `- ${base}`,
-                `  - ${reviewLink}`,
-                `  - ${retroLink}`
+                `  - [[${review}]]`,
+                `  - [[${retro}]]`
               ].join('\n');
             }).join('\n');
 
@@ -248,30 +224,19 @@ jobs:
               '[[Home]]',
               '',
               '## Sprints',
-              sidebarSprintBlocks || '_No closed sprints yet_',
+              sidebarBlocks || '_No closed sprints yet_',
               '',
               '---',
-              '[[All Sprints|Sprints/All]]',
-              '[[Practices - How we work|Practices/How-we-work]]',
-              '[[Templates|Templates/README]]',
+              '[[All Sprints|Sprints - All]]',
+              '[[Practices - How we work]]',
+              '[[Templates|Templates - README]]',
               ''
             ].join('\n');
             fs.writeFileSync(path.join(wikiDir, '_Sidebar.md'), sidebar, 'utf8');
 
-            // ===== Dynamic Home.md =====
+            // Dynamic Home.md
             const currentOpen = openMilestones[0] || null;       // soonest-due open
-            const latestClosed = closedMilestones[0] || null;     // most recent closed
-
-            function sprintName(ms) {
-              const m = (ms?.title || '').match(/(Sprint\s+\d+)/i);
-              return m ? m[1] : (ms?.title || 'Sprint');
-            }
-            function sprintLinks(ms) {
-              // Only used for closed sprints
-              const base = sprintName(ms);
-              const basePath = `Sprints/${safePath(base)}`;
-              return `[[Review|${basePath}/Review]] · [[Retro|${basePath}/Retro]]`;
-            }
+            const latest = closedMilestones[0] || null;           // most recent closed
 
             const sections = [
               '# Testing Project Wiki',
@@ -280,7 +245,6 @@ jobs:
               ''
             ];
 
-            // Current sprint: NO Review/Retro links — just due date + milestone
             if (currentOpen) {
               const name = sprintName(currentOpen);
               sections.push(
@@ -292,14 +256,13 @@ jobs:
               );
             }
 
-            // Latest closed sprint: include Review/Retro links
-            if (latestClosed) {
-              const name = sprintName(latestClosed);
+            if (latest) {
+              const base = sprintName(latest);
               sections.push(
                 '## Latest Sprint',
-                `**${esc(name)}**`,
-                `Closed: ${fmtDate(latestClosed.closed_at)}`,
-                sprintLinks(latestClosed),
+                `**${esc(base)}**`,
+                `Closed: ${fmtDate(latest.closed_at)}`,
+                `[[${reviewPageTitle(base)}]] · [[${retroPageTitle(base)}]]`,
                 ''
               );
             }
@@ -307,9 +270,9 @@ jobs:
             sections.push(
               '---',
               '### Quick Links',
-              '- [[All Sprints|Sprints/All]]',
-              '- [[Practices - How we work|Practices/How-we-work]]',
-              '- [[Templates|Templates/README]]',
+              '- [[All Sprints|Sprints - All]]',
+              '- [[Practices - How we work]]',
+              '- [[Templates|Templates - README]]',
               '---',
               '## What this is',
               '- Public record of what we planned, shipped, and learned.',
@@ -325,5 +288,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "docs(wiki): update sprint pages, sidebar, All, and dynamic Home" || echo "No changes to commit."
+          git commit -m "docs(wiki): update pages (closed-only), sidebar, All, dynamic Home (flat)" || echo "No changes to commit."
           git push
