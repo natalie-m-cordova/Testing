@@ -108,7 +108,6 @@
 
     const publicOnly = data.filter(p => (p.visibility || 'public') === 'public');
     if (publicOnly.length === 0) return renderPlaceholder();
-
     if (msg) msg.remove();
     grid.innerHTML = publicOnly.map(card).join('\n');
   }
