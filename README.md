@@ -1,7 +1,7 @@
 # Testing Repository
 
 <div style="display: flex;">
-  <div style="flex: 1; padding-right: 10px; text-align: center;">
+  <div style="flex: 1; padding-right: 10px; justify-content: center;">
     <a href="LICENSE.md"><img alt="License: CC BY 4.0" src="https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg"></a>
     <img alt="Last Commit" src="https://img.shields.io/github/last-commit/NMRCDova/Testing">
     <img alt="Issues" src="https://img.shields.io/github/issues/NMRCDova/Testing">
