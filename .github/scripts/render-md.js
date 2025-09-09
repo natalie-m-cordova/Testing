@@ -2,7 +2,7 @@
 // Replaces placeholders in markdown files with repo metadata from GitHub Actions.
 // Supported placeholders: ${REPO_OWNER}, ${REPO_NAME}, ${REPO_SLUG}, ${REPO_URL}, ${OWNER_URL}
 //
-// Usage (in CI): `node scripts/render-readme.js`
+// Usage (in CI): `node scripts/render-md.js`
 // - Prefers README.template.md if present; otherwise uses README.md as the template.
 // - Writes result to README.md.
 // - Idempotent: if no changes, it still exits 0.
