@@ -6,26 +6,43 @@
   <title>Portfolio – Skills</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
   <link rel="stylesheet" href="../assets/css/style.css"/>
+  <!-- Core JS (navigation highlight + footer year) -->
   <script defer src="../assets/js/main.js"></script>
+  <!-- Page-specific logic (loads /data/skills.json and renders placeholder/graph) -->
+  <script defer src="../assets/js/skills.js"></script>
 </head>
 <body>
   <header>
     <div class="container nav">
-      <a class="brand" href="../index.html"><img src="../favicon.svg" alt="logo"/> <span>Portfolio</span></a>
-        <nav class="nav-links">
-          <a data-nav href="../projects/">Projects</a>
-          <a data-nav href="../skills/">Skills</a>
-          <a data-nav href="https://github.com/natalie-m-cordova/Testing/wiki" target="_blank" rel="noopener">Wiki</a>
-        </nav>
+      <nav class="nav-links">
+        <a data-nav href="../projects/">Projects</a>
+        <a data-nav href="../skills/">Skills</a>
+        <a data-nav href="https://github.com/natalie-m-cordova/Testing/wiki" target="_blank" rel="noopener">Wiki</a>
+      </nav>
     </div>
   </header>
 
   <main class="container">
     <h1>Skills (Constellation)</h1>
-    <p>This page will load <code>/data/skills.json</code> and render a D3 constellation. For now, placeholder content.</p>
-    <div class="card">
-      <p>Graph placeholder. Next step: add D3 and wire to JSON.</p>
-    </div>
+    <p>This page will load <code>/data/skills.json</code> and render a D3 constellation. Until then, you’ll see a placeholder.</p>
+
+    <!-- Graph wrapper (JS will enhance this) -->
+    <section class="card">
+      <h2 class="visually-hidden">Skills Graph</h2>
+      <div id="skills-graph" class="graph-shell" aria-live="polite">
+        <div class="graph-placeholder center">
+          <p>Graph placeholder. Next step: wire D3 to <code>/data/skills.json</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fallback list view (populated from JSON as a simple list for now) -->
+    <section class="card">
+      <h2>All Skills (Fallback List)</h2>
+      <div id="skills-list">
+        <p class="muted">Loading skills…</p>
+      </div>
+    </section>
   </main>
 
   <footer>

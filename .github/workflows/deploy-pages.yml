@@ -1,0 +1,62 @@
+name: Deploy Pages (artifact, no commits)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare build dir
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -r docs/* _site/
+
+      - name: Inject repo variables
+        shell: bash
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+
+          lc_owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          lc_repo="$(echo "$REPO"  | tr '[:upper:]' '[:lower:]')"
+          if [[ "$lc_repo" == "$lc_owner.github.io" ]]; then
+            BASE="/"
+          else
+            BASE="/$REPO"
+          fi
+
+          export OWNER REPO BASE
+          mapfile -t files < <(find _site -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' \))
+          for f in "${files[@]}"; do
+            sed -i \
+              -e "s|\${REPO_OWNER}|$OWNER|g" \
+              -e "s|\${REPO_NAME}|$REPO|g" \
+              -e "s|\${PAGES_BASE}|$BASE|g" \
+              "$f"
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
