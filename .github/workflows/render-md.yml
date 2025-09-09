@@ -23,7 +23,7 @@ jobs:
       - name: Render Markdown placeholders
         run: |
           node --version
-          node scripts/render-md.js
+          node .github/scripts/render-md.js
 
       - name: Commit README if changed
         uses: stefanzweifel/git-auto-commit-action@v5
