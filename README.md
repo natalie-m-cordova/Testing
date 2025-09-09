@@ -1,13 +1,13 @@
 # Testing Repository
 
-<div style="display: flex;">
-  <div style="flex: 1; padding-right: 10px; justify-content: center;">
+<div style="display: flex;  justify-content: center;">
+  <div style="flex: 1; padding-right: 10px;">
     <a href="LICENSE.md"><img alt="License: CC BY 4.0" src="https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg"></a>
     <img alt="Last Commit" src="https://img.shields.io/github/last-commit/NMRCDova/Testing">
     <img alt="Issues" src="https://img.shields.io/github/issues/NMRCDova/Testing">
     <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/NMRCDova/Testing">
   </div>
-  <div style="flex: 1; padding-left: 10px; text-align: center;">
+  <div style="flex: 1; padding-left: 10px;">
     <img alt="Contributors" src="https://img.shields.io/github/contributors/NMRCDova/Testing">
     <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--In--Progress-blue"><!-- SPRINT BADGE END -->
     <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-lightgrey">
