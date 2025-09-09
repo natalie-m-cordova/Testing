@@ -1,23 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Portfolio – Skills</title>
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml"/>
-  <link rel="stylesheet" href="../assets/css/style.css"/>
-  <!-- Core JS (navigation highlight + footer year) -->
-  <script defer src="../assets/js/main.js"></script>
-  <!-- Page-specific logic (loads /data/skills.json and renders placeholder/graph) -->
-  <script defer src="../assets/js/skills.js"></script>
+  <base href="${PAGES_BASE}">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml"/>
+  <link rel="stylesheet" href="assets/css/style.css"/>
+  <script defer src="assets/js/main.js"></script>
+  <script defer src="assets/js/skills.js"></script>
 </head>
 <body>
   <header>
     <div class="container nav">
       <nav class="nav-links">
-        <a data-nav href="../projects/">Projects</a>
-        <a data-nav href="../skills/">Skills</a>
-        <a data-nav href="https://github.com/natalie-m-cordova/Testing/wiki" target="_blank" rel="noopener">Wiki</a>
+        <a data-nav href="projects/">Projects</a>
+        <a data-nav href="skills/">Skills</a>
+        <a data-nav href="https://github.com/${REPO_OWNER}/${REPO_NAME}/wiki" target="_blank" rel="noopener">Wiki</a>
       </nav>
     </div>
   </header>
@@ -46,7 +45,7 @@
   </main>
 
   <footer>
-    <div class="container">© <span id="y"></span> NMRCDova</div>
+    <div class="container">© <span id="y"></span> ${REPO_OWNER} — <a id="srcLink" href="https://github.com/${REPO_OWNER}/${REPO_NAME}">source</a></div>
   </footer>
 </body>
 </html>
