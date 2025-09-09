@@ -8,8 +8,8 @@
   <img alt="Issues" src="https://img.shields.io/github/issues/NMRCDova/Testing">
   <img alt="Contributors" src="https://img.shields.io/github/contributors/NMRCDova/Testing">
   <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--In--Progress-blue"><!-- SPRINT BADGE END -->
-  <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-lightgrey">
-  <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-blue">
+  <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-purple">
+  <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-pink">
 </p>
 
 ## Project Overview
