@@ -50,3 +50,11 @@ footer{margin-top:auto; border-top:1px solid var(--border); padding:24px 0; colo
 .btn{display:inline-block; padding:10px 14px; border-radius:12px; text-decoration:none; color:#fff; background:linear-gradient(135deg,var(--brand),var(--accent)); box-shadow:var(--shadow)}
 .center{display:flex; justify-content:center; align-items:center; text-align:center}
 hr{border:0; border-top:1px solid var(--border); margin:28px 0}
+
+/* Accessibility utility */
+.visually-hidden {position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px, 1px, 1px, 1px); white-space:nowrap;}
+/* Subtle text */
+.muted { color: var(--muted); }
+/* Graph shell look */
+.graph-shell {width: 100%; min-height: 280px; border: 1px dashed var(--border); border-radius: 12px; padding: 12px; background: var(--card); position: relative;}
+.graph-placeholder { min-height: 220px; }
