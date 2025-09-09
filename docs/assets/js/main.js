@@ -1,36 +1,29 @@
 (function () {
-  // ---------- Helpers ----------
-  function trimSlash(s) { return s.replace(/\/+$/, ''); }
-  function firstPathSeg() {
-    const segs = location.pathname.split('/').filter(Boolean);
-    return segs.length ? segs[0] : '';
-  }
-  // On GitHub Pages, path is /<user>.github.io/<repo>/...
-  // repoRoot becomes '/Testing' for this repo; '' for localhost or custom hosts.
-  const repoRoot = (location.hostname.endsWith('github.io') ? `/${firstPathSeg()}` : '');
+  // ---------- Small helpers ----------
+  const baseEl = document.querySelector('base');
+  const BASE = baseEl ? baseEl.href : document.baseURI; // absolute URL with trailing slash
 
-  function resolvePath(p) {
-    // always return repo-rooted absolute path like '/Testing/projects/'
-    if (p.startsWith('http')) return p;
-    const clean = p.startsWith('/') ? p : '/' + p.replace(/^\.{1,2}\//, '');
-    return repoRoot + clean;
-  }
+  const toURL = (p) => new URL(p, BASE);                 // resolve against <base>
+  const trimSlash = (s) => s.replace(/\/+$/, '');
+  const samePath = (a, b) => trimSlash(a) === trimSlash(b);
 
   // ---------- Mark active nav link ----------
-  const here = trimSlash(location.pathname);
-  document.querySelectorAll('a[data-nav]').forEach(a => {
-    // Normalize hrefs to work on Pages
-    const raw = a.getAttribute('href') || '';
-    // Leave absolute http(s) links alone
-    if (!/^https?:\/\//i.test(raw)) {
-      const fixed = resolvePath(raw);
-      a.setAttribute('href', fixed);
-    }
-    const href = trimSlash(a.getAttribute('href'));
-    // active if URL ends with link path, or link points to '/.../index.html' variant
-    if (href && (here.endsWith(href) || (href.endsWith('/index.html') && here.endsWith(href.replace('/index.html',''))))) {
-      a.classList.add('active');
-    }
+  document.addEventListener('DOMContentLoaded', () => {
+    const herePath = new URL(location.href).pathname;
+
+    document.querySelectorAll('a[data-nav]').forEach(a => {
+      // Resolve the anchor's href against the base
+      const hrefURL = toURL(a.getAttribute('href') || '');
+      const hrefPath = hrefURL.pathname;
+
+      // Consider both "/path" and "/path/index.html" as the same
+      const hereIndex = herePath.endsWith('/') ? herePath + 'index.html' : herePath;
+      const linkIndex = hrefPath.endsWith('/') ? hrefPath + 'index.html' : hrefPath;
+
+      if (samePath(herePath, hrefPath) || samePath(hereIndex, linkIndex)) {
+        a.classList.add('active');
+      }
+    });
   });
 
   // ---------- Footer year & source link ----------
@@ -40,13 +33,25 @@
 
     const src = document.getElementById('srcLink');
     if (src) {
-      // Try to infer "owner/repo" from hostname + path on Pages
-      // e.g. https://natalie-m-cordova.github.io/Testing/...
-      const segs = location.pathname.split('/').filter(Boolean);
-      const repo = (location.hostname.endsWith('github.io') && segs.length >= 1) ? segs[0] : 'Testing';
-      // If you rename the repo, this keeps working on Pages automatically
-      // (owner inferred from hostname, repo from first path segment)
-      const owner = location.hostname.replace('.github.io','');
+      // Prefer placeholders replaced by the Action; otherwise infer for local/dev
+      const ownerFromTpl = src.dataset.owner || '${REPO_OWNER}';
+      const repoFromTpl  = src.dataset.repo  || '${REPO_NAME}';
+
+      let owner = ownerFromTpl;
+      let repo  = repoFromTpl;
+
+      // Fallback inference when viewing locally (placeholders not replaced)
+      if (owner.includes('${') || repo.includes('${}')) {
+        const u = new URL(BASE);
+        if (u.hostname.endsWith('github.io')) {
+          owner = u.hostname.replace('.github.io', '');
+          // First non-empty path segment is the repo for project pages
+          const seg = u.pathname.split('/').filter(Boolean)[0] || '';
+          repo = seg || repo;
+        }
+      }
+
+      // Set final link
       src.href = `https://github.com/${owner}/${repo}`;
     }
   });
@@ -57,7 +62,6 @@
     const msg  = document.getElementById('projectsMsg');
     if (!grid) return;
 
-    // Helper to render a single card
     const card = (p) => {
       const tags = (p.tags || []).map(t => `<span class="badge">${t}</span>`).join(' ');
       const priv = (p.visibility && p.visibility !== 'public') ? `<span class="badge">private</span>` : '';
@@ -76,47 +80,34 @@
         </article>`;
     };
 
-    // If JSON isn’t there yet, render a friendly placeholder and bail
-    function renderPlaceholder() {
-      if (msg) msg.textContent = 'No project data found yet. Once your Action commits /data/projects.json, this page will auto-fill.';
+    const renderPlaceholder = () => {
+      if (msg) msg.textContent = 'No project data found yet. Once your Action publishes /data/projects.json, this page will auto-fill.';
       grid.innerHTML = `
         <article class="card">
           <h3>Example Project</h3>
           <p>Replace with real cards loaded from JSON.</p>
           <p><span class="badge">example</span></p>
         </article>`;
-    }
+    };
 
-    // Try both absolute (Pages) and relative (local dev) locations
+    // Resolve against <base>, but still work if opened from file:// locally
     const candidates = [
-      resolvePath('/data/projects.json'),
-      '../data/projects.json',
-      './data/projects.json'
+      toURL('data/projects.json').href,
+      'data/projects.json'
     ];
 
     let data = null;
     for (const url of candidates) {
       try {
         const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) {
-          data = await res.json();
-          break;
-        }
+        if (res.ok) { data = await res.json(); break; }
       } catch (_) { /* try next */ }
     }
 
-    if (!data || !Array.isArray(data)) {
-      renderPlaceholder();
-      return;
-    }
+    if (!data || !Array.isArray(data)) return renderPlaceholder();
 
-    // Filter out private by default for the public page
     const publicOnly = data.filter(p => (p.visibility || 'public') === 'public');
-
-    if (publicOnly.length === 0) {
-      renderPlaceholder();
-      return;
-    }
+    if (publicOnly.length === 0) return renderPlaceholder();
 
     if (msg) msg.remove();
     grid.innerHTML = publicOnly.map(card).join('\n');

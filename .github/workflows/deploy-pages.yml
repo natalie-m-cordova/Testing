@@ -21,22 +21,30 @@ jobs:
           rm -rf _site
           mkdir -p _site
           cp -r docs/* _site/
+          # Ensure GH Pages does not run Jekyll (so .yml, folders starting with _ etc. don't change behavior)
+          touch _site/.nojekyll
 
       - name: Inject repo variables
         shell: bash
         run: |
+          set -euo pipefail
+
           OWNER="${{ github.repository_owner }}"
           REPO="${{ github.event.repository.name }}"
 
           lc_owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
           lc_repo="$(echo "$REPO"  | tr '[:upper:]' '[:lower:]')"
+
+          # Compute BASE with trailing slash for <base href="...">
           if [[ "$lc_repo" == "$lc_owner.github.io" ]]; then
             BASE="/"
           else
-            BASE="/$REPO"
+            BASE="/$REPO/"
           fi
 
           export OWNER REPO BASE
+
+          # Replace placeholders in site files
           mapfile -t files < <(find _site -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' \))
           for f in "${files[@]}"; do
             sed -i \
