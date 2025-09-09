@@ -94,10 +94,10 @@ jobs:
               const reviewMd = [
                 `# ${base} Review`,
                 '',
-                `**Milestone:** [${esc(ms.title)}](${ms.html_url})`,
-                `**State:** ${ms.state}`,
-                `**Due:** ${fmtDate(ms.due_on)}  |  **Closed:** ${fmtDate(ms.closed_at)}`,
-                `**Issues:** ${onlyIssues.length} total — ${done.length} closed / ${todo.length} open`,
+                `- **Milestone:** [${esc(ms.title)}](${ms.html_url})`,
+                `- **State:** ${ms.state}`,
+                `- **Due:** ${fmtDate(ms.due_on)}  |  **Closed:** ${fmtDate(ms.closed_at)}`,
+                `- **Issues:** ${onlyIssues.length} total — ${done.length} closed / ${todo.length} open`,
                 '',
                 '---',
                 '## Outcomes',
@@ -140,6 +140,9 @@ jobs:
                   '',
                   '## Action items',
                   '- ',
+                  '',
+                  '## $(base) Review',
+                  `- See [[${reviewPageTitle(base)}]].`,
                   ''
                 ].join('\n'), 'utf8');
               }
@@ -182,7 +185,7 @@ jobs:
 
             const openRows = openMilestones.map(ms => {
               const base = sprintName(ms);
-              return `| ${base} | Open | ${fmtDate(ms.due_on)} | — | [Milestone](${ms.html_url}) |`;
+              return `| ${base} | Open | ${fmtDate(ms.due_on)} | [Milestone](${ms.html_url}) |`;
             });
 
             const allMd = [
@@ -198,9 +201,9 @@ jobs:
               '',
               '## Open',
               '',
-              '| Sprint | State | Due | Closed | Links |',
-              '|---|---|---|---|---|',
-              openRows.length ? openRows.join('\n') : '| _None_ |  |  |  |  |',
+              '| Sprint | State | Due | Links |',
+              '|---|---|---|---|',
+              openRows.length ? openRows.join('\n') : '| _None_ |  |  |  |',
               ''
             ].join('\n');
 
@@ -227,9 +230,9 @@ jobs:
               sidebarBlocks || '_No closed sprints yet_',
               '',
               '---',
-              '[[All Sprints|Sprints - All]]',
-              '[[Practices - How we work]]',
-              '[[Templates|Templates - README]]',
+              '- [[All Sprints|Sprints - All]]',
+              '- [[Practices - How we work]]',
+              '- [[Templates|Templates - README]]',
               ''
             ].join('\n');
             fs.writeFileSync(path.join(wikiDir, '_Sidebar.md'), sidebar, 'utf8');
@@ -250,8 +253,8 @@ jobs:
               sections.push(
                 '## Current Sprint',
                 `**${esc(name)}**`,
-                `Due: ${fmtDate(currentOpen.due_on)}`,
-                `Milestone: [${esc(currentOpen.title)}](${currentOpen.html_url})`,
+                `- Due: ${fmtDate(currentOpen.due_on)}`,
+                `- Milestone: [${esc(currentOpen.title)}](${currentOpen.html_url})`,
                 ''
               );
             }
@@ -261,8 +264,9 @@ jobs:
               sections.push(
                 '## Latest Sprint',
                 `**${esc(base)}**`,
-                `Closed: ${fmtDate(latest.closed_at)}`,
-                `[[${reviewPageTitle(base)}]] · [[${retroPageTitle(base)}]]`,
+                `- Closed: ${fmtDate(latest.closed_at)}`,
+                `- [[${reviewPageTitle(base)}]]`,
+                ` - [[${retroPageTitle(base)}]]`,
                 ''
               );
             }
