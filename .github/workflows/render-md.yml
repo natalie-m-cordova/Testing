@@ -1,4 +1,4 @@
-name: Render README Variables
+name: Render Markdown Variables
 
 on:
   push:
@@ -20,10 +20,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Render README placeholders
+      - name: Render Markdown placeholders
         run: |
           node --version
-          node scripts/render-readme.js
+          node scripts/render-md.js
 
       - name: Commit README if changed
         uses: stefanzweifel/git-auto-commit-action@v5
