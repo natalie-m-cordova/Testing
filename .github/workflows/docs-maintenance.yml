@@ -1,0 +1,141 @@
+name: Docs Maintenance (Render MD • Contributors • Sprint Badge)
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * *'
+  issues:
+    types: [opened, edited, closed, deleted, reopened]
+  pull_request:
+    types: [opened, edited, reopened, synchronize, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # safer for PR branches
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # --- Render Markdown Variables (from render-md) ---
+      - name: Render Markdown placeholders
+        run: node .github/scripts/render-md.js
+
+      # --- Update Contributors (from update-contributors) ---
+      - name: Install Octokit dependencies (contributors)
+        run: npm install @octokit/core @octokit/plugin-paginate-rest @octokit/plugin-rest-endpoint-methods
+
+      - name: Update contributors list
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}   # optional, preserved
+          CONTRIB_SINCE_DAYS: "365"
+          CONTRIB_AVATAR_SIZE: "64"
+        run: node .github/scripts/updateContributors.js
+
+      # --- Update Sprint Badge (from update-sprint-badge) ---
+      - name: Compute sprint badge from milestones
+        id: sprint
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const open = await github.rest.issues.listMilestones({
+              owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
+            });
+
+            let chosen = open.data[0];
+            let status = 'Planned';
+            let color = 'lightgrey';
+
+            if (!chosen) {
+              const closed = await github.rest.issues.listMilestones({
+                owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
+              });
+              chosen = closed.data[0] || null;
+              if (chosen) { status = 'Completed'; color = 'success'; }
+            } else {
+              const today = new Date().toISOString().slice(0,10);
+              const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
+              const closedCount = chosen.closed_issues || 0;
+              if (due && due < today) { status = 'Overdue'; color = 'red'; }
+              else if (closedCount > 0) { status = 'In Progress'; color = 'blue'; }
+            }
+
+            function hyphenate(s){ return String(s || '').trim().replace(/\s+/g, '-'); }
+            const m = chosen && chosen.title ? chosen.title.match(/Sprint\s+(\d+)/i) : null;
+            const sprintNum = m ? m[1] : (chosen ? chosen.title : 'N-A');
+            const statusLabel = String(status).replace(/\s+/g, '--');
+            const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
+
+            const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
+            core.setOutput('badge', badge);
+
+      - name: Update README badge between markers
+        if: ${{ steps.sprint.outputs.badge != '' }}
+        env:
+          BADGE: ${{ steps.sprint.outputs.badge }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          fn = "README.md"
+          with open(fn, "r", encoding="utf-8") as f:
+              txt = f.read()
+          badge = os.environ.get("BADGE", "").strip()
+          if not badge:
+              print("No BADGE provided; skipping."); sys.exit(0)
+          pat = r"<!--\s*SPRINT BADGE START\s*-->.*?<!--\s*SPRINT BADGE END\s*-->"
+          repl = f"<!-- SPRINT BADGE START -->{badge}<!-- SPRINT BADGE END -->"
+          new = re.sub(pat, repl, txt, flags=re.S)
+          if new != txt:
+              with open(fn, "w", encoding="utf-8") as f:
+                  f.write(new)
+              print("README updated.")
+          else:
+              print("No change to README.md")
+          PY
+
+      # --- Create or update a PR with any changes ---
+      - name: Create Pull Request with changes
+        if: github.event_name != 'pull_request'   # don't open PRs from PR events
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/docs-maintenance
+          title: "chore(docs): maintenance update"
+          commit-message: "chore(docs): maintenance update"
+          body: |
+            Automated docs maintenance:
+            - Rendered README placeholders
+            - Updated contributors section
+            - Updated Sprint badge (if applicable)
+
+            _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
+          labels: |
+            automation
+            documentation
+          add-paths: |
+            README.md
+            CONTRIBUTING.md
+            **/*.md
+          delete-branch: true
+          signoff: false

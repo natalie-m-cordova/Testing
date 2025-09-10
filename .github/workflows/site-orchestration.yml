@@ -1,0 +1,145 @@
+name: Pages Pipeline (Build projects.json • Build site • PR • Deploy)
+
+on:
+  pull_request:
+    paths:
+      - 'docs/projects/**/meta.json'
+      - 'Templates/meta.schema.json'
+      - '.github/scripts/build-projects-json.js'
+      - 'docs/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - 'yarn.lock'
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_stage:
+    name: Build projects.json and site; stage PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # to create/update the PR branch
+      pull-requests: write   # to open/update the PR
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i
+          fi
+
+      # ---- Build projects.json ----
+      - name: Build projects JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          if npm run -s | grep -qx 'build:projects'; then
+            npm run build:projects
+          else
+            node .github/scripts/build-projects-json.js
+          fi
+
+
+      # ---- Optional: validate (your validate:projects points to same script) ----
+      # - name: Validate projects.json
+      #   run: npm run validate:projects
+
+      # ---- Build the site ----
+      - name: Build site
+        id: sitebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          if npm run -s | grep -qx 'build'; then
+            npm run build
+          else
+            echo "No npm \"build\" script; skipping site build."
+          fi
+
+          # Detect typical static output dir in order of preference
+          SITE=""
+          for d in _site dist build docs; do
+            if [ -d "$d" ]; then SITE="$d"; break; fi
+          done
+          if [ -z "$SITE" ]; then
+            echo "❌ Could not find site output directory (_site, dist, build, docs)."
+            echo "If your site is static in docs/, create it or adjust the list above."
+            exit 1
+          fi
+          echo "site_dir=$SITE" >> "$GITHUB_OUTPUT"
+          echo "Detected site dir: $SITE"
+
+      # ---- Upload Pages artifact so main can deploy it after merge ----
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.sitebuild.outputs.site_dir }}
+
+      # ---- Create or update a single PR with any file changes ----
+      - name: Create Pull Request with changes
+        if: github.event_name != 'pull_request'   # don’t open PRs from PR events
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/pages-pipeline
+          title: "chore(pages): build projects.json and site"
+          commit-message: "chore(pages): update projects.json and site sources"
+          body: |
+            Automated Pages pipeline:
+            - Built `data/projects.json`
+            - Built static site
+            - Staged Pages artifact for deployment after merge to `main`
+
+            This PR only updates files when there are diffs.
+          labels: |
+            automation
+            portfolio
+          # Include any changed files (projects JSON, docs, site sources, etc.)
+          add-paths: |
+            data/projects.json
+            docs/**
+            package.json
+            package-lock.json
+            pnpm-lock.yaml
+            yarn.lock
+          delete-branch: true
+          signoff: false
+
+  deploy_pages:
+    name: Deploy to GitHub Pages (on main)
+    runs-on: ubuntu-latest
+    needs: [build_and_stage]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

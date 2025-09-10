@@ -1,4 +1,4 @@
-name: Milestone → Wiki (Flat pages + Closed only + Sidebar + All + Dynamic Home)
+name: Milestone → Wiki (flat/folders switch)
 
 on:
   milestone:
@@ -8,18 +8,25 @@ on:
       milestone_number:
         description: "Milestone number to export (optional)"
         required: false
+      layout_mode:
+        description: "Wiki layout: flat or folders"
+        required: false
+        default: "flat"   # choices: flat, folders
 
 permissions:
   contents: write
 
 env:
-  MAX_LATEST: "3"   # keep latest N closed sprints in the sidebar
+  MAX_LATEST: "3"   # how many latest closed sprints to show in the sidebar
 
 jobs:
   export-sprint-to-wiki:
     runs-on: ubuntu-latest
+    concurrency:
+      group: wiki-export-${{ github.ref }}
+      cancel-in-progress: true
     steps:
-      - name: Checkout repo (to get script)
+      - name: Checkout repo (to get scripts)
         uses: actions/checkout@v4
 
       - name: Checkout Wiki repo
@@ -35,7 +42,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies (Octokit, AJV, etc.)
+      - name: Install dependencies (Octokit etc.)
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -43,7 +50,9 @@ jobs:
             npm i
           fi
 
-      - name: Build Sprint pages (external script)
+      # -------- flat mode --------
+      - name: Build wiki (flat)
+        if: ${{ (inputs.layout_mode || 'flat') == 'flat' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIKI_DIR: wiki
@@ -51,11 +60,21 @@ jobs:
           MILESTONE_NUMBER: ${{ inputs.milestone_number }}
         run: node .github/scripts/milestone-to-wiki-flat.js
 
+      # -------- folders mode --------
+      - name: Build wiki (folders)
+        if: ${{ (inputs.layout_mode || 'flat') == 'folders' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIKI_DIR: wiki
+          MAX_LATEST: ${{ env.MAX_LATEST }}
+          MILESTONE_NUMBER: ${{ inputs.milestone_number }}
+        run: node .github/scripts/milestone-to-wiki-folders.js
+
       - name: Commit & Push wiki changes
         run: |
           cd wiki
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "docs(wiki): update pages (closed-only), sidebar, All, dynamic Home (flat)" || echo "No changes to commit."
+          git commit -m "docs(wiki): update sprint pages, sidebar, All, and Home" || echo "No changes to commit."
           git push
