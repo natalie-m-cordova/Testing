@@ -26,43 +26,9 @@ env:
 permissions:
   contents: read
   issues: write
-  # pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.issue.number || inputs.number || github.run_id }}
-  cancel-in-progress: false
-
-name: Issue Ops (Project • Owner • Labels • Sprint→Field/Milestone)
-
-on:
-  issues:
-    types: [opened, edited, labeled, reopened]
-  workflow_dispatch:
-    inputs:
-      number:
-        description: "Issue number to reprocess (optional)"
-        required: false
-        type: number
-
-env:
-  PROJECT_BOARD_NAME: "Testing Project Board"
-  PROJECT_SPRINT_FIELD_NAME: "Sprint"
-  DEFAULT_ASSIGNEES: "NMRCDova"
-  TYPE_LABEL_MAP_JSON: >-
-    {
-      "epic": "type: Epic",
-      "bug": "type: Bug",
-      "enhancement": "type: Enhancement",
-      "documentation": "type: Documentation",
-      "duplicate": "type: Duplicate"
-    }
-
-permissions:
-  contents: read
-  issues: write
-
-concurrency:
-  group: issue-ops-${{ github.event.issue.number || inputs.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -163,6 +129,7 @@ jobs:
         if: ${{ env.PROJECT_BOARD_NAME == '' }}
         run: echo "PROJECT_BOARD_NAME not set; skipping project add."
 
+      # 👇 turn the secret into a step output we can branch on
       - name: Check PAT availability
         id: pat
         env:
