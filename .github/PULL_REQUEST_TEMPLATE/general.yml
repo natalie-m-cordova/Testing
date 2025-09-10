@@ -1,0 +1,46 @@
+name: "General Pull Request"
+description: "Use this template for most changes"
+title: "PR: [Title of Change]"
+labels: ["pr/general"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Provide a brief summary of the changes.
+      placeholder: What does this PR do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots (if UI)
+      description: Add screenshots or screen recordings if applicable.
+      placeholder: Drag and drop images here
+
+  - type: textarea
+    id: test-notes
+    attributes:
+      label: Test Notes
+      description: Describe how this change was tested.
+      placeholder: Steps for reviewers to test this PR
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      description: List any risks, edge cases, or breaking changes.
+      placeholder: Any potential side effects?
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Code follows project style guidelines
+        - label: All tests pass locally
+        - label: Documentation updated if needed
+        - label: Linked relevant issues
