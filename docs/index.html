@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Portfolio - Home</title>
-  <base href="${PAGES_PASE}">
+  <base href=${PAGES_PASE}>
   <meta name="description" content="Projects and skills by ${REPO_OWNER}"/>
   <link rel="icon" href="favicon.svg" type="image/svg+xml"/>
   <link rel="stylesheet" href="assets/css/style.css"/>
@@ -18,7 +18,7 @@
         <a data-nav href="projects/">Projects</a>
         <a data-nav href="skills/">Skills</a>
         <a data-nav href="https://github.com/${REPO_OWNER}/${REPO_NAME}/wiki" target="_blank" rel="noopener">Wiki</a>
-        <a class="btn" data-nav href="https://github.com/$(REPO_OWNER)" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn" data-nav href="https://github.com/${REPO_OWNER}" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
@@ -59,7 +59,7 @@
   </main>
 
   <footer>
-    div class="container">© <span id="y"></span> ${REPO_OWNER} — <a id="srcLink" href="https://github.com/${REPO_OWNER}/${REPO_NAME}">source</a></div>
+    <div class="container">© <span id="y"></span> ${REPO_OWNER} — <a id="srcLink" href="https://github.com/${REPO_OWNER}/${REPO_NAME}">source</a></div>
   </footer>
 </body>
 </html>

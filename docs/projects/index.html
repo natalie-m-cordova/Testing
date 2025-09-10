@@ -30,8 +30,20 @@
     <div id="projects-status" class="card" role="status" aria-live="polite">
       Loading projects…
     </div>
-
-    <div id="projects-grid" class="grid" hidden></div>
+    <div class="toolbar card">
+      <div>
+        <strong>Sort by:</strong>
+        <label>
+          <input type="radio" name="sort" value="date" checked>
+          Date (newest)
+        </label>
+        <label>
+          <input type="radio" name="sort" value="rating">
+          Rating (desc)
+        </label>
+      </div>
+      <div class="muted">Showing public projects</div>
+    </div>
 
     <noscript>
       <p class="card">Enable JavaScript to view the projects list.</p>
