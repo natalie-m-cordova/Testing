@@ -1,0 +1,27 @@
+name: "Chore/Infra Pull Request"
+description: "Template for CI/CD, build, or dependency updates"
+title: "Chore: [Update]"
+labels: ["chore", "infra"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this update needed?
+      placeholder: Dependency bump, CI workflow fix, etc.
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Does this impact builds, tests, or deployments?
+      placeholder: Any risks to note?
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: CI/CD passes after changes
+        - label: Local environment works as expected
+        - label: No breaking changes introduced

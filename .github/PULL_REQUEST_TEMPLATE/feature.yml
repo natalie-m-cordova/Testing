@@ -1,0 +1,37 @@
+name: "Feature Pull Request"
+description: "Template for new features"
+title: "Feat: [Feature Name]"
+labels: ["feature", "enhancement"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: Describe the feature’s goal.
+      placeholder: Why is this feature needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Notes
+      description: Explain how the feature was implemented.
+      placeholder: Key design or architecture notes
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: List test cases added or updated.
+      placeholder: Unit, integration, or manual tests
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Added/updated documentation
+        - label: Added/updated tests
+        - label: Backwards compatible
+        - label: Linked to related issues/epics
