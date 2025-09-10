@@ -1,45 +1,50 @@
-name: Validate & Build Projects JSON
+name: Build projects.json and PR
 
 on:
-  pull_request:
-    paths:
-      - 'docs/projects/**/meta.json'
-      - 'Templates/meta.schema.json'
-      - '.github/scripts/build-projects-json.js'
+  workflow_dispatch:
   push:
-    branches: [ main ]
-    paths:
-      - 'docs/projects/**'
-      - 'Templates/meta.schema.json'
-      - '.github/scripts/build-projects-json.js'
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  build:
+  build-and-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Checkout (use PAT)
+        uses: actions/checkout@v4
         with:
-          node-version: '20'
+          token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          fetch-depth: 0
 
-      - name: Install deps (ajv + formats)
-        run: npm i --no-save ajv@^8 ajv-formats@^3
-
-      - name: Validate then Build projects.json
-        run: node .github/scripts/build-projects-json.js
-
-      # Only commit the generated file on main pushes
-      - name: Commit updated data/projects.json
-        if: github.ref == 'refs/heads/main'
+      - name: Build data/projects.json
         run: |
-          if [[ -n "$(git status --porcelain data/projects.json)" ]]; then
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/projects.json
-            git commit -m "chore(data): update projects.json"
-            git push
+          node .github/scripts/build-projects-json.js
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git status --porcelain data/projects.json | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Create Pull Request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.ORG_GRAPHQL_TOKEN }}  # ← your PAT
+          commit-message: "chore(data): update projects.json"
+          committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          branch: "chore/update-projects-json"
+          delete-branch: true
+          title: "chore(data): update projects.json"
+          body: |
+            Auto-generated update to `data/projects.json`.
+            - Script: `.github/scripts/build-projects-json.js`
+            - Trigger: ${{ github.event_name }} on ${{ github.ref }}
+          labels: chore, automation
