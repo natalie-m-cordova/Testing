@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-/**
- * Validate docs/projects/*/meta.json against Templates/meta.schema.json
- * and, if valid, emit data/projects.json for the site.
- *
- * - Skips folders starting with "_" or "."
- * - On any validation error, exits 1 (no file is written)
- */
+
+//  Validate docs/projects/*/meta.json against Templates/meta.schema.json
+//  and, if valid, emit data/projects.json for the site.
+// 
+//  - Skips folders starting with "_" or "."
+//  - On any validation error, exits 1 (no file is written)
+ 
 const fs = require('fs');
 const path = require('path');
 const Ajv = require('ajv');
