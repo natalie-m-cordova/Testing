@@ -1,0 +1,10 @@
+{
+  "title": "Project Title",
+  "summary": "Short description here.",
+  "tags": ["js","game"],
+  "visibility": "private",
+  "createdAt": "YYYY-MM-DD",
+  "updatedAt": "YYYY-MM-DD",
+  "link": "",
+  "repo": ""
+}

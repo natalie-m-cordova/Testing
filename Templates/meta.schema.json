@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/project-meta.schema.json",
+  "title": "Project Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "summary", "tags", "visibility", "createdAt"],
+  "properties": {
+    "title":      { "type": "string", "minLength": 1, "maxLength": 120 },
+    "summary":    { "type": "string", "minLength": 1, "maxLength": 300 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "uniqueItems": true,
+      "maxItems": 12
+    },
+    "visibility": { "type": "string", "enum": ["public", "private"] },
+    "createdAt":  { "type": "string", "format": "date" },
+    "updatedAt":  { "type": "string", "format": "date" },
+    "link":       { "type": "string", "format": "uri", "maxLength": 2048 },
+    "repo":       { "type": "string", "format": "uri", "maxLength": 2048 }
+  }
+}

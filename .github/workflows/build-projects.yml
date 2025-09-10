@@ -1,0 +1,45 @@
+name: Validate & Build Projects JSON
+
+on:
+  pull_request:
+    paths:
+      - 'docs/projects/**/meta.json'
+      - 'Templates/meta.schema.json'
+      - '.github/scripts/build-projects-json.js'
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/projects/**'
+      - 'Templates/meta.schema.json'
+      - '.github/scripts/build-projects-json.js'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (ajv + formats)
+        run: npm i --no-save ajv@^8 ajv-formats@^3
+
+      - name: Validate then Build projects.json
+        run: node .github/scripts/build-projects-json.js
+
+      # Only commit the generated file on main pushes
+      - name: Commit updated data/projects.json
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [[ -n "$(git status --porcelain data/projects.json)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/projects.json
+            git commit -m "chore(data): update projects.json"
+            git push
+          else
+            echo "No changes to commit."
+          fi
