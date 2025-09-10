@@ -58,3 +58,8 @@ hr{border:0; border-top:1px solid var(--border); margin:28px 0}
 /* Graph shell look */
 .graph-shell {width: 100%; min-height: 280px; border: 1px dashed var(--border); border-radius: 12px; padding: 12px; background: var(--card); position: relative;}
 .graph-placeholder { min-height: 220px; }
+
+/* Toolbar styles */
+.toolbar {display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;}
+.toolbar label {cursor: pointer; user-select: none; margin-left: 10px;}
+.toolbar input[type="radio"] { vertical-align: middle; margin-right: 6px;}
