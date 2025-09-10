@@ -3,5 +3,14 @@
     "@octokit/core": "^7.0.3",
     "@octokit/plugin-paginate-rest": "^13.1.1",
     "@octokit/plugin-rest-endpoint-methods": "^16.0.0"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "scripts": {
+    "build:projects": "node .github/scripts/build-projects-json.js",
+    "validate:projects": "node .github/scripts/build-projects-json.js",
+    "new:project": ".github/scripts/new-project.sh"
   }
 }
