@@ -32,6 +32,39 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.issue.number || inputs.number || github.run_id }}
   cancel-in-progress: false
 
+name: Issue Ops (Project • Owner • Labels • Sprint→Field/Milestone)
+
+on:
+  issues:
+    types: [opened, edited, labeled, reopened]
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "Issue number to reprocess (optional)"
+        required: false
+        type: number
+
+env:
+  PROJECT_BOARD_NAME: "Testing Project Board"
+  PROJECT_SPRINT_FIELD_NAME: "Sprint"
+  DEFAULT_ASSIGNEES: "NMRCDova"
+  TYPE_LABEL_MAP_JSON: >-
+    {
+      "epic": "type: Epic",
+      "bug": "type: Bug",
+      "enhancement": "type: Enhancement",
+      "documentation": "type: Documentation",
+      "duplicate": "type: Duplicate"
+    }
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-ops-${{ github.event.issue.number || inputs.number || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   prepare:
     name: Prepare context
@@ -51,6 +84,7 @@ jobs:
             const inputNumber = core.getInput('number') || null;
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
+
             const issue = inputNumber
               ? (await github.rest.issues.get({ owner, repo, issue_number: Number(inputNumber) })).data
               : (context.payload.issue || null);
@@ -128,8 +162,16 @@ jobs:
       - name: Skip (no project board name set)
         if: ${{ env.PROJECT_BOARD_NAME == '' }}
         run: echo "PROJECT_BOARD_NAME not set; skipping project add."
+
+      - name: Check PAT availability
+        id: pat
+        env:
+          PAT: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+        run: |
+          if [ -n "${PAT}" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Add issue to Project (Projects v2)
-        if: ${{ env.PROJECT_BOARD_NAME != '' && secrets.ORG_GRAPHQL_TOKEN != '' }}
+        if: ${{ env.PROJECT_BOARD_NAME != '' && steps.pat.outputs.has == 'true' }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
@@ -174,8 +216,9 @@ jobs:
             );
             const itemId = added?.addProjectV2ItemById?.item?.id || "";
             core.info(`Added issue to project "${projectTitle}" (itemId=${itemId}).`);
-      - name: Skip note (no PAT)
-        if: ${{ env.PROJECT_BOARD_NAME != '' && secrets.ORG_GRAPHQL_TOKEN == '' }}
+
+      - name: Note (PAT missing)
+        if: ${{ env.PROJECT_BOARD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot modify org Projects v2. Skipping project add."
 
   sprint_to_project_field:
@@ -186,8 +229,16 @@ jobs:
       - name: Skip (no sprint slug or field name)
         if: ${{ needs.prepare.outputs.sprint_slug == '' || env.PROJECT_SPRINT_FIELD_NAME == '' }}
         run: echo "No sprint slug or field name; skipping project field update."
+
+      - name: Check PAT availability
+        id: pat
+        env:
+          PAT: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+        run: |
+          if [ -n "${PAT}" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Update Project field (uses PAT)
-        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && secrets.ORG_GRAPHQL_TOKEN != '' }}
+        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has == 'true' }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
@@ -281,14 +332,14 @@ jobs:
               }`, { projectId, itemId, fieldId: f.id, value }
             );
             core.info(`Updated project field "${fieldName}" to "${sprintValue}".`)
-      - name: Skip note (no PAT)
-        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && secrets.ORG_GRAPHQL_TOKEN == '' }}
+      - name: Note (PAT missing)
+        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
 
   sprint_to_milestone:
     name: Sprint → Milestone
     runs-on: ubuntu-latest
-    needs: [prepare, sprint_to_project_field]  # include 'prepare' so needs.prepare.* is defined
+    needs: [prepare, sprint_to_project_field]
     if: ${{ needs.prepare.outputs.sprint_slug != '' }}
     steps:
       - name: Ensure milestone exists and assign
