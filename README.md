@@ -35,6 +35,10 @@ It simulates an open-source repository environment.
 - [License](LICENSE.md)
 - [Security Policy](SECURITY.md)
 
+## Maintainer Docs
+- [Maintainer Docs](.github/handbook/)
+- [How to scaffold a project](.github/handbook/SOP-projects-metadata-validation-build.md)
+
 ## Milestones & Roadmap
 We organize work using Agile-style sprint milestones and EPIC issues.
 
@@ -59,6 +63,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
   <a href="https://github.com/NMRCDova" title="NMRCDova • 223 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
+
 
 
 ---
