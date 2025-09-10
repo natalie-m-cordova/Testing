@@ -4,6 +4,11 @@
 
 Thank you for your interest in contributing to the **Testing** project! We welcome contributions from everyone. Please review the following guidelines to help us maintain a healthy and productive community.
 
+> **Maintainer Docs (internal):** See the repository handbook at  
+> [`.github/handbook/`](.github/handbook/) →  
+> **SOP — Projects Metadata, Validation & Build:**  
+> [.github/handbook/SOP-projects-metadata-validation-build.md](.github/handbook/SOP-projects-metadata-validation-build.md)
+
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
