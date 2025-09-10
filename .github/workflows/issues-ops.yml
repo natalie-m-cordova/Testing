@@ -1,0 +1,329 @@
+name: Issue Ops (Project • Owner • Labels • Sprint→Field/Milestone)
+
+on:
+  issues:
+    types: [opened, edited, labeled, reopened]
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "Issue number to reprocess (optional)"
+        required: false
+        type: number
+
+# ---------------------------
+# Top-level variables (easy to tweak later)
+# ---------------------------
+env:
+  PROJECT_BOARD_NAME: "Testing Project Board"   # ← Kanban board title
+  PROJECT_SPRINT_FIELD_NAME: "Sprint"           # ← text or single-select/iteration field to set
+  DEFAULT_ASSIGNEES: "NMRCDova"                 # ← comma-separated (e.g., "octocat,hubot") or leave blank
+  TYPE_LABEL_MAP_JSON: >-
+    {
+      "epic": "type: Epic",
+      "bug": "type: Bug",
+      "enhancement": "type: Enhancement",
+      "documentation": "type: Documentation",
+      "duplicate": "type: Duplicate"
+    }
+
+permissions:
+  contents: read
+  issues: write
+  # pull-requests: read
+
+concurrency:
+  group: issue-ops-${{ github.event.issue.number || inputs.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare context
+    runs-on: ubuntu-latest
+    outputs:
+      issue_number: ${{ steps.ctx.outputs.issue_number }}
+      issue_node_id: ${{ steps.ctx.outputs.issue_node_id }}
+      labels_json: ${{ steps.ctx.outputs.labels_json }}
+      sprint_label: ${{ steps.ctx.outputs.sprint_label }}     # e.g., "Sprint 12"
+      sprint_slug: ${{ steps.ctx.outputs.sprint_slug }}       # e.g., "Sprint 12" normalized
+    steps:
+      - name: Derive context
+        id: ctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const inputNumber = core.getInput('number') || null;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            const issue = inputNumber
+              ? (await github.rest.issues.get({ owner, repo, issue_number: Number(inputNumber) })).data
+              : (context.payload.issue || null);
+
+            if (!issue) core.setFailed("No issue context found.");
+
+            // Labels
+            const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean);
+            const sprint = labels.find(l => /^sprint\s*\d+$/i.test(l)) || "";
+
+            // Get GraphQL node id for add-to-project
+            const data = await github.graphql(`
+              query($owner:String!,$repo:String!,$number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  issue(number:$number) { id number }
+                }
+              }`,
+              { owner, repo, number: issue.number }
+            );
+            const nodeId = data?.repository?.issue?.id || "";
+
+            core.setOutput('issue_number', String(issue.number));
+            core.setOutput('issue_node_id', nodeId);
+            core.setOutput('labels_json', JSON.stringify(labels));
+            core.setOutput('sprint_label', sprint);
+            core.setOutput('sprint_slug', sprint.replace(/\s+/g,' ').trim());
+      - name: Log context
+        run: |
+          echo "issue_number=${{ steps.ctx.outputs.issue_number }}"
+          echo "sprint_label=${{ steps.ctx.outputs.sprint_label }}"
+          echo "labels=${{ steps.ctx.outputs.labels_json }}"
+
+  assign_and_normalize:
+    name: Assign owner & normalize labels
+    runs-on: ubuntu-latest
+    needs: [prepare]  # ← run FIRST after prepare
+    steps:
+      - name: Assign default owners (if configured)
+        if: ${{ env.DEFAULT_ASSIGNEES != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const list = (process.env.DEFAULT_ASSIGNEES || '').split(',').map(s=>s.trim()).filter(Boolean);
+            if (!list.length) { core.info('No default assignees configured.'); return; }
+            await github.rest.issues.addAssignees({
+              ...context.repo,
+              issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
+              assignees: list
+            });
+            core.info(`Assigned: ${list.join(', ')}`);
+      - name: Normalize type labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const map = JSON.parse(process.env.TYPE_LABEL_MAP_JSON || "{}");
+            const labels = JSON.parse('${{ needs.prepare.outputs.labels_json }}');
+            const add = [];
+            for (const l of labels) {
+              const to = map[(l||'').toLowerCase()];
+              if (to && !labels.includes(to)) add.push(to);
+            }
+            if (add.length) {
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
+                labels: add
+              });
+              core.info(`Added type labels: ${add.join(', ')}`);
+            } else {
+              core.info('No type label changes.');
+            }
+
+  project_add:
+    name: Add to Project board
+    runs-on: ubuntu-latest
+    needs: [prepare, assign_and_normalize]  # ← run AFTER assign/normalize
+    if: ${{ env.PROJECT_BOARD_NAME != '' }}
+    steps:
+      - name: Add issue to Project (Projects v2)
+        if: ${{ !!secrets.ORG_GRAPHQL_TOKEN }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const projectTitle = process.env.PROJECT_BOARD_NAME;
+            const issueNodeId = "${{ needs.prepare.outputs.issue_node_id }}";
+            if (!issueNodeId) {
+              core.setFailed("Missing issue node id.");
+              return;
+            }
+
+            // 1) Find project by title under org, then user fallback
+            let projectId = null;
+            try {
+              const qOrg = await github.graphql(`
+                query($login:String!,$q:String!) {
+                  organization(login:$login) {
+                    projectsV2(first: 20, query: $q) { nodes { id title } }
+                  }
+                }`, { login: owner, q: projectTitle }
+              );
+              projectId = qOrg?.organization?.projectsV2?.nodes?.find(n => n.title === projectTitle)?.id || null;
+            } catch {}
+
+            if (!projectId) {
+              try {
+                const qUser = await github.graphql(`
+                  query($login:String!,$q:String!) {
+                    user(login:$login) {
+                      projectsV2(first: 20, query: $q) { nodes { id title } }
+                    }
+                  }`, { login: owner, q: projectTitle }
+              );
+                projectId = qUser?.user?.projectsV2?.nodes?.find(n => n.title === projectTitle)?.id || null;
+              } catch {}
+            }
+
+            if (!projectId) {
+              core.warning(`Project board "${projectTitle}" not found under ${owner}. Skipping.`);
+              return;
+            }
+
+            // 2) Add item to project
+            const added = await github.graphql(`
+              mutation($projectId:ID!, $contentId:ID!) {
+                addProjectV2ItemById(input:{ projectId:$projectId, contentId:$contentId }) {
+                  item { id }
+                }
+              }`,
+              { projectId, contentId: issueNodeId }
+            );
+            const itemId = added?.addProjectV2ItemById?.item?.id || "";
+            core.info(`Added issue to project "${projectTitle}" (itemId=${itemId}).`);
+      - name: Skip note (no PAT)
+        if: ${{ !secrets.ORG_GRAPHQL_TOKEN }}
+        run: echo "ORG_GRAPHQL_TOKEN not set; cannot modify org Projects v2. Skipping project add."
+
+  sprint_to_project_field:
+    name: Sprint → Project field
+    runs-on: ubuntu-latest
+    needs: [prepare, project_add]  # field update after project add
+    if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' }}
+    steps:
+      - name: Update Project field (uses PAT)
+        if: ${{ !!secrets.ORG_GRAPHQL_TOKEN }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const projectTitle = process.env.PROJECT_BOARD_NAME;
+            const fieldName = process.env.PROJECT_SPRINT_FIELD_NAME;
+            const issueNodeId = "${{ needs.prepare.outputs.issue_node_id }}";
+            const sprintValue = "${{ needs.prepare.outputs.sprint_slug }}";
+
+            // find project
+            async function findProjectId() {
+              try {
+                const qOrg = await github.graphql(`
+                  query($login:String!,$q:String!) {
+                    organization(login:$login) {
+                      projectsV2(first: 20, query: $q) { nodes { id title } }
+                    }
+                  }`, { login: owner, q: projectTitle }
+                );
+                const n = qOrg?.organization?.projectsV2?.nodes?.find(n => n.title === projectTitle);
+                if (n) return n.id;
+              } catch {}
+              const qUser = await github.graphql(`
+                query($login:String!,$q:String!) {
+                  user(login:$login) {
+                    projectsV2(first: 20, query: $q) { nodes { id title } }
+                  }
+                }`, { login: owner, q: projectTitle }
+              );
+              const m = qUser?.user?.projectsV2?.nodes?.find(n => n.title === projectTitle);
+              return m?.id || null;
+            }
+
+            const projectId = await findProjectId();
+            if (!projectId) { core.warning(`Project "${projectTitle}" not found.`); return; }
+
+            // get the item id for this issue in the project (removed unused var)
+            const items = await github.graphql(`
+              query($projectId:ID!) {
+                node(id:$projectId) {
+                  ... on ProjectV2 {
+                    items(first: 50) {
+                      nodes { id content { ... on Issue { id number } } }
+                    }
+                  }
+                }
+              }`, { projectId }
+            );
+            const item = items?.node?.items?.nodes?.find(n => n?.content?.id === issueNodeId);
+            if (!item?.id) { core.warning("Project item not found for this issue."); return; }
+            const itemId = item.id;
+
+            // discover field by name and data type
+            const fields = await github.graphql(`
+              query($projectId:ID!) {
+                node(id:$projectId) {
+                  ... on ProjectV2 {
+                    fields(first: 50) {
+                      nodes {
+                        ... on ProjectV2FieldCommon { id name dataType }
+                        ... on ProjectV2SingleSelectField { id name dataType options { id name } }
+                        ... on ProjectV2IterationField { id name dataType configuration { iterations { id title } } }
+                      }
+                    }
+                  }
+                }
+              }`, { projectId }
+            );
+            const f = fields?.node?.fields?.nodes?.find(x => (x?.name||"") === fieldName);
+            if (!f?.id) { core.warning(`Field "${fieldName}" not found.`); return; }
+
+            // Set based on field type
+            let value = null;
+            if (f.dataType === 'TEXT') {
+              value = { text: sprintValue };
+            } else if (f.dataType === 'SINGLE_SELECT') {
+              const opt = (f.options || []).find(o => o.name === sprintValue);
+              if (!opt) { core.warning(`Single-select option "${sprintValue}" not found.`); return; }
+              value = { singleSelectOptionId: opt.id };
+            } else if (f.dataType === 'ITERATION') {
+              const iter = f.configuration?.iterations?.find(i => i.title === sprintValue);
+              if (!iter) { core.warning(`Iteration "${sprintValue}" not found.`); return; }
+              value = { iterationId: iter.id };
+            } else {
+              core.warning(`Unsupported field dataType: ${f.dataType}`);
+              return;
+            }
+
+            await github.graphql(`
+              mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!,$value:ProjectV2FieldValue!) {
+                updateProjectV2ItemFieldValue(input:{
+                  projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:$value
+                }) { projectV2Item { id } }
+              }`, { projectId, itemId, fieldId: f.id, value }
+            );
+            core.info(`Updated project field "${fieldName}" to "${sprintValue}".`)
+      - name: Skip note (no PAT)
+        if: ${{ !secrets.ORG_GRAPHQL_TOKEN }}
+        run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
+
+  sprint_to_milestone:
+    name: Sprint → Milestone
+    runs-on: ubuntu-latest
+    needs: [sprint_to_project_field]  # ← run AFTER we set the project field
+    if: ${{ needs.prepare.outputs.sprint_slug != '' }}
+    steps:
+      - name: Ensure milestone exists and assign
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "${{ needs.prepare.outputs.sprint_slug }}";
+            const { data: milestones } = await github.rest.issues.listMilestones({
+              ...context.repo, state: 'open'
+            });
+            let ms = milestones.find(m => m.title.toLowerCase() === title.toLowerCase());
+            if (!ms) {
+              ms = (await github.rest.issues.createMilestone({ ...context.repo, title })).data;
+              core.info(`Created milestone: ${ms.title}`);
+            }
+            await github.rest.issues.update({
+              ...context.repo,
+              issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
+              milestone: ms.number
+            });
+            core.info(`Assigned milestone "${ms.title}".`)
