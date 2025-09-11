@@ -50,46 +50,6 @@ jobs:
           CONTRIB_AVATAR_SIZE: "64"
         run: node .github/scripts/updateContributors.js
 
-      # --- Update Sprint Badge (from update-sprint-badge) ---
-      - name: Compute sprint badge from milestones
-        id: sprint
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            const open = await github.rest.issues.listMilestones({
-              owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
-            });
-
-            let chosen = open.data[0];
-            let status = 'Planned';
-            let color = 'lightgrey';
-
-            if (!chosen) {
-              const closed = await github.rest.issues.listMilestones({
-                owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
-              });
-              chosen = closed.data[0] || null;
-              if (chosen) { status = 'Completed'; color = 'success'; }
-            } else {
-              const today = new Date().toISOString().slice(0,10);
-              const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
-              const closedCount = chosen.closed_issues || 0;
-              if (due && due < today) { status = 'Overdue'; color = 'red'; }
-              else if (closedCount > 0) { status = 'In Progress'; color = 'blue'; }
-            }
-
-            function hyphenate(s){ return String(s || '').trim().replace(/\s+/g, '-'); }
-            const m = chosen && chosen.title ? chosen.title.match(/Sprint\s+(\d+)/i) : null;
-            const sprintNum = m ? m[1] : (chosen ? chosen.title : 'N-A');
-            const statusLabel = String(status).replace(/\s+/g, '--');
-            const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
-
-            const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
-            core.setOutput('badge', badge);
-
       - name: Compute sprint badge from milestones
         id: sprint
         uses: actions/github-script@v7
@@ -127,7 +87,7 @@ jobs:
             const statusLabel = String(status).replace(/\s+/g, '--');
             const label = `Sprint-${sprintNum}--${statusLabel}`;
             const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
-            core.setOutput('badge', badge);  
+            core.setOutput('badge', badge);
       
       - name: Create Pull Request with changes
         id: cpr
