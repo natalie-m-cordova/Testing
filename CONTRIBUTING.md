@@ -12,14 +12,11 @@ Thank you for your interest in contributing to the **Testing** project! We welco
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 305 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 307 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
-<h2> Previous Contributors </h2>
-<!-- PREVIOUS-CONTRIBUTORS:START -->
-<!-- none -->
-<!-- PREVIOUS-CONTRIBUTORS:END -->
+<!-- empty: keep wrapper -->
 <!-- PREV-BLOCK:END -->
 
 ## How to Contribute
