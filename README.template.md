@@ -68,10 +68,8 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
 
 ## Sprint Notes (Wiki)
-
-- **Latest Review:** [Sprint 1 Review](../../wiki/Sprints/Sprint-1-Review)
-- **Latest Retro:** [Sprint 1 Retrospective](../../wiki/Sprints/Sprint-1-Retrospective)
-- **How We Work:** [Practices](../../wiki/Practices/How-We-Work)
+<!-- WIKI:NOTES START -->
+<!-- WIKI:NOTES END -->
 
 ## Acknowledgments
 This project uses the [git-auto-commit-action](https://github.com/stefanzweifel/git-auto-commit-action) by @stefanzweifel for automating README updates.
