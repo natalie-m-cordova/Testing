@@ -105,18 +105,18 @@ function replaceWholeBlock(filePath, wrapperStart, wrapperEnd, newContentOrEmpty
     console.warn(`⚠️ Wrapper not found in ${filePath}: ${wrapperStart} / ${wrapperEnd}`);
     return false;
   }
-  const out =
-    newContentOrEmpty.trim().length > 0
-      ? src.replace(
-          re,
-          `<!-- ${wrapperStart} -->\n${newContentOrEmpty}\n<!-- ${wrapperEnd} -->`
-        )
-      : src.replace(re, ""); // remove the whole block if empty
-  fs.writeFileSync(filePath, out, "utf8");
-  console.log(
-    `✅ ${newContentOrEmpty.trim().length ? "Updated" : "Removed"} wrapper ${wrapperStart}..${wrapperEnd} in ${filePath}`
+  const inner =
+   newContentOrEmpty && newContentOrEmpty.trim().length
+     ? newContentOrEmpty.trim()
+     // keep wrapper + a tiny hidden placeholder so formatters don’t collapse it
+     : `<!-- empty: keep wrapper -->`;
+  const out = src.replace(
+    re,
+    `<!-- ${wrapperStart} -->\n${inner}\n<!-- ${wrapperEnd} -->`
   );
-  return true;
+  fs.writeFileSync(filePath, out, "utf8");
+  console.log(`✅ Updated wrapper ${wrapperStart}..${wrapperEnd} in ${filePath}`);
+   return true;
 }
 
 // ----- Data fetch -----
@@ -233,7 +233,7 @@ async function countIssuesPRs(login, sinceISO) {
     // Build a full "Previous Contributors" block (header + inner markers) if non-empty
     const prevBlock = previous.length
       ? [
-          "## Previous Contributors",
+          "<h1>Previous Contributors</h1>",
           "<!-- PREVIOUS-CONTRIBUTORS:START -->",
           previousHTML,
           "<!-- PREVIOUS-CONTRIBUTORS:END -->",
