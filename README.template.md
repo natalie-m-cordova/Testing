@@ -43,14 +43,22 @@ It simulates an open-source repository environment.
 We organize work using Agile-style sprint milestones and EPIC issues.
 
 ### Current Milestone
+<!-- SPRINTS:CURRENT START -->
+<!-- SPRINTS:CURRENT END -->
 **Sprint 1 – Auto-Assign + Documentation Foundations**
 *Due: 2025-09-19*
 - Auto-Assign Improvements (CODEOWNERS, GitHub Actions, Project Workflows)
 - Documentation Foundations (README.md, SECURITY.md, LICENSE.md)
 
 ### Planned Milestones
+<!-- SPRINTS:OPEN START -->
+<!-- SPRINTS:OPEN END -->
 - **Sprint 2 – Advanced Workflow Automation** *(TBD)*
 - **Sprint 3 – Community & Collaboration** *(TBD)*
+
+### Recently Closed
+<!-- SPRINTS:CLOSED START -->
+<!-- SPRINTS:CLOSED END -->
 
 ---
 
@@ -59,9 +67,6 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ## Contributors
 <!-- CONTRIBUTORS:START -->
-<p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 223 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
-</p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START --> 
 <!-- PREV-BLOCK:END -->
