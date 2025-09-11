@@ -13,7 +13,11 @@ on:
 env:
   PROJECT_BOARD_NAME: "Testing Project Board"
   PROJECT_SPRINT_FIELD_NAME: "Sprints"
+  PROJECT_PRIORITY_FIELD_NAME: "Priority"
+  PROJECT_TARGET_DATE_FIELD_NAME: "Target Date"
   DEFAULT_ASSIGNEES: "NMRCDova"
+  DEFAULT_PRIORITY: "Low"
+  TARGET_DATE_OFFSET_DAYS: "7"
   TYPE_LABEL_MAP_JSON: >-
     {
       "epic": "type: Epic",
@@ -242,6 +246,7 @@ jobs:
     needs: [prepare]
     outputs:
       item_id: ${{ steps.add_item.outputs.item_id }}
+
     steps:
       - name: Skip (no project board name set)
         if: ${{ env.PROJECT_BOARD_NAME == '' }}
@@ -254,7 +259,7 @@ jobs:
         run: |
           if [ -n "${PAT}" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Add issue to Project (Projects v2)
+      - name: Add issue to Project Board
         id: add_item
         if: ${{ env.PROJECT_BOARD_NAME != '' && steps.pat.outputs.has == 'true' }}
         uses: actions/github-script@v7
@@ -287,25 +292,24 @@ jobs:
 
             const added = await github.graphql(`
               mutation($projectId:ID!, $contentId:ID!) {
-                addProjectV2ItemById(input:{ projectId:$projectId, contentId:$contentId }) {
-                  item { id }
-                }
+                addProjectV2ItemById(input:{ projectId:$projectId, contentId:$contentId }) {item { id }}
               }`, { projectId, contentId: issueNodeId });
             const itemId = added?.addProjectV2ItemById?.item?.id || "";
             core.setOutput('item_id', itemId);
             core.info(`Added to project "${projectTitle}" (itemId=${itemId}).`);
+
       - name: Note (PAT missing)
         if: ${{ env.PROJECT_BOARD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot modify org Projects v2. Skipping project add."
 
-  sprint_to_project_field:
-    name: Sprint → Project field
+  project_field_update:
+    name: Project fields update
     runs-on: ubuntu-latest
     needs: [prepare, project_add]
     steps:
-      - name: Skip (no sprint slug or field name)
-        if: ${{ needs.prepare.outputs.sprint_slug == '' || env.PROJECT_SPRINT_FIELD_NAME == '' }}
-        run: echo "No sprint slug or field name; skipping project field update."
+      - name: Note (no sprint label detected)
+        if: ${{ needs.prepare.outputs.sprint_slug == '' }}
+        run: echo "No sprint label."
 
       - name: Check PAT availability
         id: pat
@@ -314,8 +318,8 @@ jobs:
         run: |
           if [ -n "${PAT}" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Update Project field (uses PAT)
-        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has == 'true' }}
+      - name: Update Project fields
+        if: ${{ steps.pat.outputs.has == 'true' }}
         uses: actions/github-script@v7
         env:
           ITEM_ID_FROM_ADD: ${{ needs.project_add.outputs.item_id }}
@@ -324,12 +328,26 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const projectTitle = process.env.PROJECT_BOARD_NAME;
-            const fieldName = process.env.PROJECT_SPRINT_FIELD_NAME;
+            const sprintFieldName = process.env.PROJECT_SPRINT_FIELD_NAME;
+            const priorityFieldName = process.env.PROJECT_PRIORITY_FIELD_NAME || '';
+            const targetDateFieldName = process.env.PROJECT_TARGET_DATE_FIELD_NAME || '';
+            const defaultPriority = process.env.DEFAULT_PRIORITY || 'Low';
+            const offsetDays = parseInt(process.env.TARGET_DATE_OFFSET_DAYS || '7', 10);
+
             const issueNodeId = "${{ needs.prepare.outputs.issue_node_id }}";
-            const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}";
+            const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}"; // "Sprint N"
+            const justAdded = !!process.env.ITEM_ID_FROM_ADD;
 
             const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-            const targetKey = norm(sprintDisplay);
+            const targetKey = sprintDisplay ? norm(sprintDisplay) : '';
+
+            function plusDaysUTC(days) {
+              const d = new Date();
+              d.setUTCHours(0,0,0,0);
+              d.setUTCDate(d.getUTCDate() + days);
+              return d.toISOString().slice(0,10); // YYYY-MM-DD
+            }
+            const defaultTargetDate = plusDaysUTC(offsetDays);
 
             async function findProjectId() {
               try {
@@ -341,7 +359,7 @@ jobs:
                 if (p) return p.id;
               } catch {}
               const qUser = await github.graphql(`
-                query($login:String!,$q:String!) {
+                query($login:String!, $q:String!) {
                   user(login:$login) { projectsV2(first: 20, query: $q) { nodes { id title } } }
                 }`, { login: owner, q: projectTitle });
               return qUser?.user?.projectsV2?.nodes?.find(n => n.title === projectTitle)?.id || null;
@@ -350,45 +368,38 @@ jobs:
             const projectId = await findProjectId();
             if (!projectId) { core.warning(`Project "${projectTitle}" not found.`); return; }
 
-            // Prefer the item id from add step; otherwise retry-search
+            // Prefer the item id from add step; otherwise try to find it (with a couple retries)
             let itemId = process.env.ITEM_ID_FROM_ADD || '';
-            if (!itemId) {
-              for (let attempt = 1; attempt <= 5 && !itemId; attempt++) {
-                const items = await github.graphql(`
-                  query($projectId:ID!, $after:String) {
-                    node(id:$projectId) { ... on ProjectV2 {
-                      items(first: 100, after:$after) {
-                        nodes { id content { ... on Issue { id number } } }
-                        pageInfo { hasNextPage endCursor }
-                      }
-                    }}`, { projectId });
-
-                let page = items?.node?.items;
-                while (page) {
-                  const hit = page.nodes?.find(n => n?.content?.id === issueNodeId);
-                  if (hit?.id) { itemId = hit.id; break; }
-                  if (page.pageInfo?.hasNextPage) {
-                    const more = await github.graphql(`
-                      query($projectId:ID!, $after:String) {
-                        node(id:$projectId) { ... on ProjectV2 {
-                          items(first: 100, after:$after) {
-                            nodes { id content { ... on Issue { id number } } }
-                            pageInfo { hasNextPage endCursor }
-                          }
-                        }}`, { projectId, after: page.pageInfo.endCursor });
-                    page = more?.node?.items;
-                  } else break;
-                }
-
-                if (!itemId) {
-                  core.info(`Item not visible yet (attempt ${attempt}/5). Waiting 2s...`);
-                  await new Promise(r => setTimeout(r, 2000));
-                }
+            for (let attempt = 1; attempt <= 3 && !itemId; attempt++) {
+              const items = await github.graphql(`
+                query($projectId:ID!, $after:String) {
+                  node(id:$projectId) { ... on ProjectV2 {
+                    items(first: 100, after: $after) {
+                      nodes { id content { ... on Issue { id number } } }
+                      pageInfo { hasNextPage endCursor }
+                    }
+                  }}}`, { projectId });
+              let page = items?.node?.items;
+              while (page) {
+                const hit = page.nodes?.find(n => n?.content?.id === issueNodeId);
+                if (hit?.id) { itemId = hit.id; break; }
+                if (page.pageInfo?.hasNextPage) {
+                  const more = await github.graphql(`
+                    query($projectId:ID!, $after:String) {
+                      node(id:$projectId) { ... on ProjectV2 {
+                        items(first: 100, after: $after) {
+                          nodes { id content { ... on Issue { id number } } }
+                          pageInfo { hasNextPage endCursor }
+                        }
+                      }}}`, { projectId, after: page.pageInfo.endCursor });
+                  page = more?.node?.items;
+                } else break;
               }
+              if (!itemId) { await new Promise(r => setTimeout(r, 1500)); }
             }
             if (!itemId) { core.warning('Project item not found for this issue.'); return; }
 
-            // Fetch fields and locate the Sprint field
+            // Fetch fields
             const fields = await github.graphql(`
               query($projectId:ID!) {
                 node(id:$projectId) { ... on ProjectV2 {
@@ -400,45 +411,87 @@ jobs:
                     }
                   }
                 }}
-              }`, { projectId }
-            );
-            const f = fields?.node?.fields?.nodes?.find(x => (x?.name||"") === fieldName);
-            if (!f?.id) { core.warning(`Field "${fieldName}" not found.`); return; }
+              }`, { projectId });
 
-            let value = null;
-            if (f.dataType === 'TEXT') {
-              value = { text: sprintDisplay }; // "Sprint N"
-            } else if (f.dataType === 'SINGLE_SELECT') {
-              const opt = (f.options || []).find(o => {
-                const k = norm(o.name);
-                return k === targetKey || k.startsWith(targetKey); // match "Sprint 12" or "Sprint 12 – …"
-              });
-              if (!opt) { core.warning(`Single-select option for "${sprintDisplay}" not found.`); return; }
-              value = { singleSelectOptionId: opt.id };
-            } else if (f.dataType === 'ITERATION') {
-              const iter = f.configuration?.iterations?.find(i => {
-                const k = norm(i.title);
-                return k === targetKey || k.startsWith(targetKey);
-              });
-              if (!iter) { core.warning(`Iteration "${sprintDisplay}" not found.`); return; }
-              value = { iterationId: iter.id };
-            } else {
-              core.warning(`Unsupported field dataType: ${f.dataType}`);
-              return;
+            const all = fields?.node?.fields?.nodes || [];
+            const fieldByName = (n) => all.find(f => (f?.name||'') === n);
+
+            const sprintField = sprintFieldName ? fieldByName(sprintFieldName) : null;
+            const priorityField = priorityFieldName ? fieldByName(priorityFieldName) : null;
+            const targetDateField = targetDateFieldName ? fieldByName(targetDateFieldName) : null;
+
+            async function updateField(field, value) {
+              await github.graphql(`
+                mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $value:ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input:{
+                    projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:$value
+                  }) { projectV2Item { id } }
+                }`, { projectId, itemId, fieldId: field.id, value });
             }
 
-            await github.graphql(`
-              mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!,$value:ProjectV2FieldValue!) {
-                updateProjectV2ItemFieldValue(input:{
-                  projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:$value
-                }) { projectV2Item { id } }
-              }`, { projectId, itemId, fieldId: f.id, value }
-            );
-            core.info(`Updated project field "${fieldName}" to "${sprintDisplay}".`);
+            // --- Set Sprints field from sprint label ---
+            if (sprintField && sprintDisplay) {
+              let value = null;
+              if (sprintField.dataType === 'TEXT') {
+                value = { text: sprintDisplay };
+              } else if (sprintField.dataType === 'SINGLE_SELECT') {
+                const opt = (sprintField.options || []).find(o => {
+                  const k = norm(o.name);
+                  return k === targetKey || k.startsWith(targetKey); // "sprint12" or "sprint12-…"
+                });
+                if (!opt) { core.warning(`Single-select option for "${sprintDisplay}" not found.`); }
+                else value = { singleSelectOptionId: opt.id };
+              } else if (sprintField.dataType === 'ITERATION') {
+                const iter = sprintField.configuration?.iterations?.find(i => {
+                  const k = norm(i.title);
+                  return k === targetKey || k.startsWith(targetKey);
+                });
+                if (!iter) { core.warning(`Iteration "${sprintDisplay}" not found.`); }
+                else value = { iterationId: iter.id };
+              } else {
+                core.warning(`Unsupported Sprint field type: ${sprintField.dataType}`);
+              }
+              if (value) { await updateField(sprintField, value); core.info(`Set "${sprintFieldName}" → ${sprintDisplay}`); }
+            }
+
+            // --- Default Priority (only when just added) ---
+            if (justAdded && priorityField && defaultPriority) {
+              if (priorityField.dataType === 'SINGLE_SELECT') {
+                const opt = (priorityField.options || []).find(o => o.name.toLowerCase() === defaultPriority.toLowerCase());
+                if (opt) {
+                  await updateField(priorityField, { singleSelectOptionId: opt.id });
+                  core.info(`Defaulted "${priorityFieldName}" → ${defaultPriority}`);
+                } else {
+                  core.warning(`Priority option "${defaultPriority}" not found. Skipping default.`);
+                }
+              } else if (priorityField.dataType === 'TEXT') {
+                await updateField(priorityField, { text: defaultPriority });
+                core.info(`Defaulted "${priorityFieldName}" (TEXT) → ${defaultPriority}`);
+              } else {
+                core.warning(`Unsupported Priority field type: ${priorityField.dataType}`);
+              }
+            } else if (!justAdded) {
+              core.info('Skipping Priority default (item existed already).');
+            }
+
+            // --- Default Target date (today + offset, only when just added) ---
+            if (justAdded && targetDateField) {
+              if (targetDateField.dataType === 'DATE') {
+                await updateField(targetDateField, { date: defaultTargetDate });
+                core.info(`Defaulted "${targetDateFieldName}" → ${defaultTargetDate}`);
+              } else if (targetDateField.dataType === 'TEXT') {
+                await updateField(targetDateField, { text: defaultTargetDate });
+                core.info(`Defaulted "${targetDateFieldName}" (TEXT) → ${defaultTargetDate}`);
+              } else {
+                core.warning(`Unsupported Target date field type: ${targetDateField.dataType}`);
+              }
+            } else if (!justAdded) {
+              core.info('Skipping Target date default (item existed already).');
+            }
 
       - name: Note (PAT missing)
-        if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has != 'true' }}
-        run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
+        if: ${{ steps.pat.outputs.has != 'true' }}
+        run: echo "ORG_GRAPHQL_TOKEN not set; cannot update project fields. Skipping."
 
   sprint_to_milestone:
     name: Sprint → Milestone
@@ -483,11 +536,10 @@ jobs:
               open.sort((a,b) => (a.due_on || '9999').localeCompare(b.due_on || '9999'));
               chosen = open[0];
             } else if (matches.length) {
-              // Among closed, prefer most recently closed
-              matches
+              const closed = matches
                 .filter(m => m.state === 'closed')
                 .sort((a,b) => (b.closed_at || '').localeCompare(a.closed_at || ''));
-              chosen = matches[0];
+              chosen = closed[0];
             }
 
             // If none matched, create a minimal "Sprint N"
