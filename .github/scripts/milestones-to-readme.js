@@ -36,6 +36,12 @@ function replaceBetweenMarkers(src, startTag, endTag, html) {
   return src.replace(re, `$1\n${html.trim()}\n$3`);
 }
 
+function stripLeadingTags(title) {
+  return String(title || "")
+    .replace(/^(?:\s*\[[^\]]+\]\s*)+/i, "") // drop one or more [tag] at the start
+    .trim();
+}
+
 async function listMilestones(state, sort, direction) {
   return await octokit.paginate(octokit.rest.issues.listMilestones, {
     owner, repo, state, sort, direction, per_page: 100,
@@ -75,7 +81,12 @@ async function listIssuesForMilestone(milestoneNumber) {
     }));
 
     const epicBullets = epicIssues.length
-      ? epicIssues.map(i => `- [${esc(i.title)}](${i.html_url})`).join("\n")
+      ? epicIssues
+          .map(i => {
+            const display = stripLeadingTags(i.title);
+            return `- [${esc(display)}](${i.html_url})`;
+          })
+          .join("\n")
       : "_No EPICs tagged in this sprint._";
 
     currentHTML = [
