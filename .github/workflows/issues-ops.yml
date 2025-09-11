@@ -128,26 +128,56 @@ jobs:
               assignees: list
             });
             core.info(`Assigned: ${list.join(', ')}`);
-      - name: Normalize type labels
+
+      - name: Normalize type labels (replace raw with canonical)
         uses: actions/github-script@v7
         with:
           script: |
-            const map = JSON.parse(process.env.TYPE_LABEL_MAP_JSON || "{}");
-            const labels = JSON.parse('${{ needs.prepare.outputs.labels_json }}');
-            const add = [];
-            for (const l of labels) {
-              const to = map[(l||'').toLowerCase()];
-              if (to && !labels.includes(to)) add.push(to);
+            const map = JSON.parse(process.env.TYPE_LABEL_MAP_JSON || "{}"); // e.g. {"bug":"type: Bug", ...}
+            const labels = JSON.parse('${{ needs.prepare.outputs.labels_json }}'); // current labels (strings)
+            const lowerSet = new Set(labels.map(l => (l||'').toLowerCase()));
+
+            // figure out which canonical labels to add and which raw labels to remove
+            const toAdd = new Set();
+            const toRemove = new Set();
+
+            for (const [raw, canonical] of Object.entries(map)) {
+              const rawLower = (raw||'').toLowerCase();
+              const canonicalLower = (canonical||'').toLowerCase();
+
+              if (lowerSet.has(rawLower)) {
+                // if canonical not already present, mark to add
+                if (!lowerSet.has(canonicalLower)) toAdd.add(canonical);
+                // always remove the raw label
+                toRemove.add(raw);
+              }
             }
-            if (add.length) {
+
+            // add canonical labels first (so we never end up with no type at all)
+            if (toAdd.size) {
               await github.rest.issues.addLabels({
                 ...context.repo,
                 issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
-                labels: add
+                labels: Array.from(toAdd)
               });
-              core.info(`Added type labels: ${add.join(', ')}`);
+              core.info(`Added canonical type labels: ${Array.from(toAdd).join(', ')}`);
             } else {
-              core.info('No type label changes.');
+              core.info('No canonical type labels to add.');
+            }
+
+            // remove raw source labels
+            for (const raw of toRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  ...context.repo,
+                  issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
+                  name: raw
+                });
+                core.info(`Removed raw label: ${raw}`);
+              } catch (e) {
+                // ignore if already removed by race
+                core.info(`Skip removing ${raw}: ${e.message}`);
+              }
             }
 
   project_add:
