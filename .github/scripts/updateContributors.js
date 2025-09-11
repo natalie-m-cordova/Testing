@@ -233,7 +233,7 @@ async function countIssuesPRs(login, sinceISO) {
     // Build a full "Previous Contributors" block (header + inner markers) if non-empty
     const prevBlock = previous.length
       ? [
-          "## Previous Contributors",
+          "<h1>Previous Contributors</h1>",
           "<!-- PREVIOUS-CONTRIBUTORS:START -->",
           previousHTML,
           "<!-- PREVIOUS-CONTRIBUTORS:END -->",
