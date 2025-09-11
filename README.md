@@ -47,8 +47,8 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
 **Sprint 2 - Portfolio Scaffold + Skills Data Pipeline (read-only)** *Due: 2025-10-03*
-- [#43](https://github.com/natalie-m-cordova/Testing/issues/43) [EPIC] Skills Graph (Notion export + basic D3)
-- [#42](https://github.com/natalie-m-cordova/Testing/issues/42) [EPIC] Portfolio Site MVP (GITHub Pages + Projects Feed)
+- [[EPIC] Skills Graph (Notion export + basic D3)](https://github.com/natalie-m-cordova/Testing/issues/43)
+- [[EPIC] Portfolio Site MVP (GITHub Pages + Projects Feed)](https://github.com/natalie-m-cordova/Testing/issues/42)
 <!-- SPRINTS:CURRENT END -->
 **Sprint 1 – Auto-Assign + Documentation Foundations**
 *Due: 2025-09-19*
@@ -59,9 +59,9 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 <!-- SPRINTS:PLANNED START -->
 | Sprint | Due | Link |
 |---|---|---|
-| Sprint 3 | 2025-10-17 | 0 | 0 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/3) |
-| Sprint 4 | 2025-10-31 | 0 | 0 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/4) |
-| Sprint 5 | 2025-11-14 | 0 | 0 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/5) |
+| Sprint 3 | 2025-10-17 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/3) |
+| Sprint 4 | 2025-10-31 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/4) |
+| Sprint 5 | 2025-11-14 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/5) |
 <!-- SPRINTS:PLANNED END -->
 - **Sprint 2 – Advanced Workflow Automation** *(TBD)*
 - **Sprint 3 – Community & Collaboration** *(TBD)*
@@ -71,7 +71,6 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 | Sprint | Due | Closed | Issues (closed/total) | Link |
 |---|---|---|---:|---|
 | Sprint 1 | 2025-09-19 | 2025-09-08 | 21/21 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/1) |
-| sprint2 | — | 2025-09-11 | 0/0 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/6) |
 <!-- SPRINTS:CLOSED END -->
 
 ---
@@ -82,7 +81,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 318 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 319 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
