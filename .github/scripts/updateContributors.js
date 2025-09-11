@@ -1,11 +1,3 @@
-<!-- PREV-BLOCK:START -->
-<h1>Previous Contributors</h1>
-<!-- PREVIOUS-CONTRIBUTORS:START -->
-...avatars...
-<!-- PREVIOUS-CONTRIBUTORS:END -->
-<!-- PREV-BLOCK:END -->
-js
-Copy code
 /**
  * updateContributors.js
  *
