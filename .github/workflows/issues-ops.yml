@@ -426,20 +426,19 @@ jobs:
         if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
 
-  sprint_to_milestone:
+sprint_to_milestone:
     name: Sprint → Milestone
     runs-on: ubuntu-latest
     needs: [prepare]
     if: ${{ needs.prepare.outputs.sprint_slug != '' }}
     steps:
-      - name: Ensure milestone exists and assign
+      - name: Ensure milestone exists and assign (robust match: "Sprint # - …")
         uses: actions/github-script@v7
         env:
           SPRINT_DISPLAY: ${{ needs.prepare.outputs.sprint_slug }}   # e.g. "Sprint 12"
           ISSUE_NUMBER: ${{ needs.prepare.outputs.issue_number }}
         with:
           script: |
-<<<<<<< HEAD
             const sprintDisplay = process.env.SPRINT_DISPLAY || '';   // "Sprint 12"
             const issueNumber   = parseInt(process.env.ISSUE_NUMBER, 10);
 
@@ -496,36 +495,3 @@ jobs:
               milestone: chosen.number
             });
             core.info(`Assigned milestone "${chosen.title}" to issue #${issueNumber}.`);
-=======
-            const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}"; // "Sprint N"
-            const number = Number("${{ needs.prepare.outputs.issue_number }}");
-
-            const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-            const targetKey = norm(sprintDisplay); // "sprint12"
-
-            // Look across ALL milestones so we don't duplicate closed ones
-            const all = await github.paginate(
-              github.rest.issues.listMilestones,
-              { ...context.repo, state: 'all', per_page: 100 }
-            );
-
-            let ms = all.find(m => {
-              const k = norm(m.title);
-              return k === targetKey || k.startsWith(targetKey); // match "Sprint 12" or "Sprint 12 - …"
-            });
-
-            // Create if not found
-            if (!ms) {
-              ms = (await github.rest.issues.createMilestone({
-                ...context.repo, title: sprintDisplay
-              })).data;
-              core.info(`Created milestone: ${ms.title}`);
-            }
-
-            await github.rest.issues.update({
-              ...context.repo,
-              issue_number: number,
-              milestone: ms.number
-            });
-            core.info(`Assigned milestone "${ms.title}".`);
->>>>>>> 0179a8194e218c0daac442c256e83e9fa14fdb88
