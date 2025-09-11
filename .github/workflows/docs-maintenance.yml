@@ -114,31 +114,6 @@ jobs:
               print("No change to README.md")
           PY
 
-      # --- Create or update a PR with any changes ---
-      - name: Create Pull Request with changes
-        if: github.event_name != 'pull_request'   # don't open PRs from PR events
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: chore/docs-maintenance
-          title: "chore(docs): maintenance update"
-          commit-message: "chore(docs): maintenance update"
-          body: |
-            Automated docs maintenance:
-            - Rendered README placeholders
-            - Updated contributors section
-            - Updated Sprint badge (if applicable)
-
-            _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
-          labels: |
-            automation
-            documentation
-          add-paths: |
-            README.md
-            CONTRIBUTING.md
-            **/*.md
-          delete-branch: true
-          signoff: false
       - name: Debug mergeability
         if: ${{ steps.cpr.outputs.pull-request-number }}
         uses: actions/github-script@v7
@@ -159,3 +134,29 @@ jobs:
               }`;
             const d = await github.graphql(q, { owner, repo, number });
             console.log(JSON.stringify(d.repository.pullRequest, null, 2));
+
+      # --- Create or update a PR with any changes ---
+      - name: Create Pull Request with changes
+        if: github.event_name != 'pull_request'   # don't open PRs from PR events
+        uses: peter-evans/create-pull-request@v6
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          branch: chore/docs-maintenance
+          title: "chore(docs): maintenance update"
+          commit-message: "chore(docs): maintenance update"
+          body: |
+            Automated docs maintenance:
+            - Rendered README placeholders
+            - Updated contributors section
+            - Updated Sprint badge (if applicable)
+
+            _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
+          labels: |
+            automation
+            documentation
+          add-paths: |
+            README.md
+            CONTRIBUTING.md
+            **/*.md
+          delete-branch: true
+          signoff: false
