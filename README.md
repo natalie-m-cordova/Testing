@@ -47,8 +47,8 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
 **Sprint 2 - Portfolio Scaffold + Skills Data Pipeline (read-only)** *Due: 2025-10-03*
-- [[EPIC] Skills Graph (Notion export + basic D3)](https://github.com/natalie-m-cordova/Testing/issues/43)
-- [[EPIC] Portfolio Site MVP (GITHub Pages + Projects Feed)](https://github.com/natalie-m-cordova/Testing/issues/42)
+- [Skills Graph (Notion export + basic D3)](https://github.com/natalie-m-cordova/Testing/issues/43)
+- [Portfolio Site MVP (GITHub Pages + Projects Feed)](https://github.com/natalie-m-cordova/Testing/issues/42)
 <!-- SPRINTS:CURRENT END -->
 **Sprint 1 – Auto-Assign + Documentation Foundations**
 *Due: 2025-09-19*
@@ -81,7 +81,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 319 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 320 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
