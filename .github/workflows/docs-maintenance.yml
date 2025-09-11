@@ -86,11 +86,13 @@ jobs:
       - name: Update README from milestones
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }} # optional reuse
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
           SPRINT_BADGE: ${{ steps.sprint.outputs.badge }}
-          MAX_RECENT_CLOSED: "5"
+          MAX_PLANNED: "3"
+          MAX_RECENT_CLOSED: "3"
+          EPIC_LABELS: "epic"   # comma-separated if you use multiple labels
         run: node .github/scripts/milestones-to-readme.js
-      
+        
       - name: Create Pull Request with changes
         id: cpr
         if: github.event_name != 'pull_request'
