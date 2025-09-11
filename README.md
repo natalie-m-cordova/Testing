@@ -7,7 +7,7 @@
   <img alt="Last Commit" src="https://img.shields.io/github/last-commit/natalie-m-cordova/Testing">
   <img alt="Issues" src="https://img.shields.io/github/issues/natalie-m-cordova/Testing">
   <img alt="Contributors" src="https://img.shields.io/github/contributors/natalie-m-cordova/Testing">
-  <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--In--Progress-blue"><!-- SPRINT BADGE END -->
+  <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-sprint2--Planned-lightgrey"><!-- SPRINT BADGE END -->
   <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-purple">
   <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-pink">
 </p>
@@ -60,7 +60,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 279 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 285 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 
