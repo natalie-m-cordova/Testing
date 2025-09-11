@@ -16,7 +16,7 @@ Thank you for your interest in contributing to the **Testing** project! We welco
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
-## Previous Contributors
+<h2> Previous Contributors </h2>
 <!-- PREVIOUS-CONTRIBUTORS:START -->
 <!-- none -->
 <!-- PREVIOUS-CONTRIBUTORS:END -->
