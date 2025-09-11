@@ -52,7 +52,6 @@ jobs:
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
-            // prefer dispatch input; else issues event payload
             const inputNumberRaw =
               (process.env.DISPATCH_ISSUE_NUMBER || (context.payload.inputs && context.payload.inputs.number) || '').trim();
 
@@ -87,7 +86,15 @@ jobs:
             }
 
             const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean);
-            const sprint = labels.find(l => /^sprint\s*\d+$/i.test(l)) || '';
+
+            // Accept: "sprint12", "sprint 12", "sprint#12"
+            const sprintLabel = labels.find(l => /^sprint\s*[-#]?\s*\d+$/i.test(l)) || '';
+            let sprintNum = '';
+            if (sprintLabel) {
+              const m = sprintLabel.match(/sprint\s*[-#]?\s*(\d+)/i) || sprintLabel.match(/sprint(\d+)/i);
+              sprintNum = m ? m[1] : '';
+            }
+            const sprintDisplay = sprintNum ? `Sprint ${sprintNum}` : '';   // e.g., "Sprint 12"
 
             const data = await github.graphql(
               `query($owner:String!,$repo:String!,$number:Int!){
@@ -100,8 +107,8 @@ jobs:
             core.setOutput('issue_number', String(issue.number));
             core.setOutput('issue_node_id', nodeId);
             core.setOutput('labels_json', JSON.stringify(labels));
-            core.setOutput('sprint_label', sprint);
-            core.setOutput('sprint_slug', sprint.replace(/\s+/g,' ').trim());
+            core.setOutput('sprint_label', sprintLabel);      // original label text
+            core.setOutput('sprint_slug', sprintDisplay);     // normalized "Sprint N"
 
       - name: Log context
         if: ${{ steps.ctx.outputs.issue_number != '' }}
@@ -326,7 +333,10 @@ jobs:
             const projectTitle = process.env.PROJECT_BOARD_NAME;
             const fieldName = process.env.PROJECT_SPRINT_FIELD_NAME;
             const issueNodeId = "${{ needs.prepare.outputs.issue_node_id }}";
-            const sprintValue = "${{ needs.prepare.outputs.sprint_slug }}";
+            const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}"; // "Sprint N"
+
+            const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+            const targetKey = norm(sprintDisplay); // "sprint12"
 
             async function findProjectId() {
               try {
@@ -347,41 +357,36 @@ jobs:
                   }
                 }`, { login: owner, q: projectTitle }
               );
-              const m = qUser?.user?.projectsV2?.nodes?.find(n => n.title === projectTitle);
-              return m?.id || null;
+              return qUser?.user?.projectsV2?.nodes?.find(n => n.title === projectTitle)?.id || null;
             }
 
             const projectId = await findProjectId();
             if (!projectId) { core.warning(`Project "${projectTitle}" not found.`); return; }
 
+            // Find this issue's item id in the project
             const items = await github.graphql(`
               query($projectId:ID!) {
-                node(id:$projectId) {
-                  ... on ProjectV2 {
-                    items(first: 50) {
-                      nodes { id content { ... on Issue { id number } } }
-                    }
-                  }
-                }
+                node(id:$projectId) { ... on ProjectV2 {
+                  items(first: 50) { nodes { id content { ... on Issue { id number } } } }
+                }}
               }`, { projectId }
             );
             const item = items?.node?.items?.nodes?.find(n => n?.content?.id === issueNodeId);
             if (!item?.id) { core.warning("Project item not found for this issue."); return; }
             const itemId = item.id;
 
+            // Fetch fields and locate the Sprint field
             const fields = await github.graphql(`
               query($projectId:ID!) {
-                node(id:$projectId) {
-                  ... on ProjectV2 {
-                    fields(first: 50) {
-                      nodes {
-                        ... on ProjectV2FieldCommon { id name dataType }
-                        ... on ProjectV2SingleSelectField { id name dataType options { id name } }
-                        ... on ProjectV2IterationField { id name dataType configuration { iterations { id title } } }
-                      }
+                node(id:$projectId) { ... on ProjectV2 {
+                  fields(first: 50) {
+                    nodes {
+                      ... on ProjectV2FieldCommon { id name dataType }
+                      ... on ProjectV2SingleSelectField { id name dataType options { id name } }
+                      ... on ProjectV2IterationField { id name dataType configuration { iterations { id title } } }
                     }
                   }
-                }
+                }}
               }`, { projectId }
             );
             const f = fields?.node?.fields?.nodes?.find(x => (x?.name||"") === fieldName);
@@ -389,14 +394,20 @@ jobs:
 
             let value = null;
             if (f.dataType === 'TEXT') {
-              value = { text: sprintValue };
+              value = { text: sprintDisplay }; // "Sprint N"
             } else if (f.dataType === 'SINGLE_SELECT') {
-              const opt = (f.options || []).find(o => o.name === sprintValue);
-              if (!opt) { core.warning(`Single-select option "${sprintValue}" not found.`); return; }
+              const opt = (f.options || []).find(o => {
+                const k = norm(o.name);
+                return k === targetKey || k.startsWith(targetKey); // match "Sprint 12" or "Sprint 12 – …"
+              });
+              if (!opt) { core.warning(`Single-select option for "${sprintDisplay}" not found.`); return; }
               value = { singleSelectOptionId: opt.id };
             } else if (f.dataType === 'ITERATION') {
-              const iter = f.configuration?.iterations?.find(i => i.title === sprintValue);
-              if (!iter) { core.warning(`Iteration "${sprintValue}" not found.`); return; }
+              const iter = f.configuration?.iterations?.find(i => {
+                const k = norm(i.title);
+                return k === targetKey || k.startsWith(targetKey);
+              });
+              if (!iter) { core.warning(`Iteration "${sprintDisplay}" not found.`); return; }
               value = { iterationId: iter.id };
             } else {
               core.warning(`Unsupported field dataType: ${f.dataType}`);
@@ -410,7 +421,8 @@ jobs:
                 }) { projectV2Item { id } }
               }`, { projectId, itemId, fieldId: f.id, value }
             );
-            core.info(`Updated project field "${fieldName}" to "${sprintValue}".`)
+            core.info(`Updated project field "${fieldName}" to "${sprintDisplay}".`);
+
       - name: Note (PAT missing)
         if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
@@ -425,18 +437,34 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const title = "${{ needs.prepare.outputs.sprint_slug }}";
-            const { data: milestones } = await github.rest.issues.listMilestones({
-              ...context.repo, state: 'open'
+            const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}"; // "Sprint N"
+            const number = Number("${{ needs.prepare.outputs.issue_number }}");
+
+            const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+            const targetKey = norm(sprintDisplay); // "sprint12"
+
+            // Look across ALL milestones so we don't duplicate closed ones
+            const all = await github.paginate(
+              github.rest.issues.listMilestones,
+              { ...context.repo, state: 'all', per_page: 100 }
+            );
+
+            let ms = all.find(m => {
+              const k = norm(m.title);
+              return k === targetKey || k.startsWith(targetKey); // match "Sprint 12" or "Sprint 12 - …"
             });
-            let ms = milestones.find(m => m.title.toLowerCase() === title.toLowerCase());
+
+            // Create if not found
             if (!ms) {
-              ms = (await github.rest.issues.createMilestone({ ...context.repo, title })).data;
+              ms = (await github.rest.issues.createMilestone({
+                ...context.repo, title: sprintDisplay
+              })).data;
               core.info(`Created milestone: ${ms.title}`);
             }
+
             await github.rest.issues.update({
               ...context.repo,
-              issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
+              issue_number: number,
               milestone: ms.number
             });
-            core.info(`Assigned milestone "${ms.title}".`)
+            core.info(`Assigned milestone "${ms.title}".`);
