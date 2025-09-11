@@ -248,7 +248,6 @@ jobs:
         if: ${{ env.PROJECT_BOARD_NAME == '' }}
         run: echo "PROJECT_BOARD_NAME not set; skipping project add."
 
-      # 👇 turn the secret into a step output we can branch on
       - name: Check PAT availability
         id: pat
         env:
@@ -435,8 +434,69 @@ jobs:
     steps:
       - name: Ensure milestone exists and assign
         uses: actions/github-script@v7
+        env:
+          SPRINT_DISPLAY: ${{ needs.prepare.outputs.sprint_slug }}   # e.g. "Sprint 12"
+          ISSUE_NUMBER: ${{ needs.prepare.outputs.issue_number }}
         with:
           script: |
+<<<<<<< HEAD
+            const sprintDisplay = process.env.SPRINT_DISPLAY || '';   // "Sprint 12"
+            const issueNumber   = parseInt(process.env.ISSUE_NUMBER, 10);
+
+            // Extract the sprint number (12)
+            const num = (sprintDisplay.match(/(\d+)/) || [])[1];
+            if (!num) {
+              core.warning(`Could not extract sprint number from "${sprintDisplay}".`);
+              return;
+            }
+
+            // Build a tolerant matcher:
+            // ^Sprint\s*#?\s*12(\b|space|dash)   → matches "Sprint 12", "Sprint #12", "Sprint 12 - Foo"
+            const re = new RegExp(`^\\s*sprint\\s*#?\\s*${num}(\\b|\\s|[-–—])`, 'i');
+
+            // Search ALL milestones so we can match closed ones too
+            const all = await github.paginate(
+              github.rest.issues.listMilestones,
+              { ...context.repo, state: 'all', per_page: 100 }
+            );
+
+            const matches = all.filter(m => re.test(m.title || ''));
+
+            // Prefer OPEN > then best CLOSED
+            let chosen = null;
+            const open = matches.filter(m => m.state !== 'closed');
+            if (open.length) {
+              // Among open, prefer earliest due date (if present)
+              open.sort((a,b) => (a.due_on || '9999').localeCompare(b.due_on || '9999'));
+              chosen = open[0];
+            } else if (matches.length) {
+              // Among closed, prefer most recently closed
+              matches
+                .filter(m => m.state === 'closed')
+                .sort((a,b) => (b.closed_at || '').localeCompare(a.closed_at || ''));
+              chosen = matches[0];
+            }
+
+            // If none matched, create a minimal "Sprint N"
+            if (!chosen) {
+              const { data: created } = await github.rest.issues.createMilestone({
+                ...context.repo,
+                title: sprintDisplay
+              });
+              chosen = created;
+              core.info(`Created milestone: ${created.title}`);
+            } else {
+              core.info(`Matched milestone: ${chosen.title} (state=${chosen.state})`);
+            }
+
+            // Assign the milestone
+            await github.rest.issues.update({
+              ...context.repo,
+              issue_number: issueNumber,
+              milestone: chosen.number
+            });
+            core.info(`Assigned milestone "${chosen.title}" to issue #${issueNumber}.`);
+=======
             const sprintDisplay = "${{ needs.prepare.outputs.sprint_slug }}"; // "Sprint N"
             const number = Number("${{ needs.prepare.outputs.issue_number }}");
 
@@ -468,3 +528,4 @@ jobs:
               milestone: ms.number
             });
             core.info(`Assigned milestone "${ms.title}".`);
+>>>>>>> 0179a8194e218c0daac442c256e83e9fa14fdb88
