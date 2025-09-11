@@ -7,7 +7,9 @@
   <img alt="Last Commit" src="https://img.shields.io/github/last-commit/natalie-m-cordova/Testing">
   <img alt="Issues" src="https://img.shields.io/github/issues/natalie-m-cordova/Testing">
   <img alt="Contributors" src="https://img.shields.io/github/contributors/natalie-m-cordova/Testing">
-  <!-- SPRINT BADGE START --><img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--In--Progress-blue"><!-- SPRINT BADGE END -->
+  <!-- SPRINT BADGE START -->
+<img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--Planned-lightgrey">
+<!-- SPRINT BADGE END -->
   <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-purple">
   <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-pink">
 </p>
@@ -44,6 +46,12 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
+<p><strong>sprint2</strong></p>
+<ul>
+  <li>Due: <code>—</code></li>
+  <li>Progress: 0 closed / 0 open</li>
+  <li>Milestone: <a href="https://github.com/natalie-m-cordova/Testing/milestone/6">sprint2</a></li>
+</ul>
 <!-- SPRINTS:CURRENT END -->
 **Sprint 1 – Auto-Assign + Documentation Foundations**
 *Due: 2025-09-19*
@@ -52,12 +60,64 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 
 ### Planned Milestones
 <!-- SPRINTS:OPEN START -->
+<table>
+<thead><tr><th align="left">Sprint</th><th align="left">Due</th><th align="left">Closed</th><th align="left">Open</th><th align="left">Link</th></tr></thead>
+<tbody>
+<tr>
+  <td>sprint2</td>
+  <td>—</td>
+  <td>0</td>
+  <td>0</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/6">Milestone</a></td>
+</tr>
+<tr>
+  <td>Sprint 2</td>
+  <td>2025-10-03</td>
+  <td>10</td>
+  <td>16</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/2">Milestone</a></td>
+</tr>
+<tr>
+  <td>Sprint 3</td>
+  <td>2025-10-17</td>
+  <td>0</td>
+  <td>0</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/3">Milestone</a></td>
+</tr>
+<tr>
+  <td>Sprint 4</td>
+  <td>2025-10-31</td>
+  <td>0</td>
+  <td>0</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/4">Milestone</a></td>
+</tr>
+<tr>
+  <td>Sprint 5</td>
+  <td>2025-11-14</td>
+  <td>0</td>
+  <td>0</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/5">Milestone</a></td>
+</tr>
+</tbody>
+</table>
 <!-- SPRINTS:OPEN END -->
 - **Sprint 2 – Advanced Workflow Automation** *(TBD)*
 - **Sprint 3 – Community & Collaboration** *(TBD)*
 
 ### Recently Closed
 <!-- SPRINTS:CLOSED START -->
+<table>
+<thead><tr><th align="left">Sprint</th><th align="left">Due</th><th align="left">Closed At</th><th align="left">Issues (closed/total)</th><th align="left">Link</th></tr></thead>
+<tbody>
+<tr>
+  <td>Sprint 1</td>
+  <td>2025-09-19</td>
+  <td>2025-09-08</td>
+  <td>21/21</td>
+  <td><a href="https://github.com/natalie-m-cordova/Testing/milestone/1">Milestone</a></td>
+</tr>
+</tbody>
+</table>
 <!-- SPRINTS:CLOSED END -->
 
 ---
@@ -68,7 +128,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 314 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 315 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
