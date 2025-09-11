@@ -139,7 +139,7 @@ jobs:
           delete-branch: true
           signoff: false
       
-      # Show what the action returned (helps confirm why debug runs/skips)
+      # (optional) print outputs so you can see why debug runs/skips
       - name: Show PR outputs (debug)
         if: ${{ always() }}
         run: |
@@ -147,36 +147,100 @@ jobs:
           echo "number=${{ steps.cpr.outputs.pull-request-number }}"
           echo "url=${{ steps.cpr.outputs.pull-request-url }}"
       
-      # Debug mergeability – run always, but skip internally if no PR number
+      # Debug mergeability (schema-safe)
       - name: Debug mergeability
         if: ${{ always() }}
         uses: actions/github-script@v7
         with:
-          # Prefer PAT if present (to reflect the real merging actor), else fallback to GITHUB_TOKEN
+          # prefer PAT if you want to reflect your real “merging actor”; else fallback to GITHUB_TOKEN
           github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const numStr = `${{ steps.cpr.outputs['pull-request-number'] }}`; // blank if no diffs
+            const numStr = `${{ steps.cpr.outputs['pull-request-number'] }}`;
             const number = parseInt(numStr || '0', 10);
-            if (!number) {
-              core.info('No PR number (probably no file changes), skipping debug.');
-              return;
-            }
+            if (!number) { core.info('No PR number (likely no diffs). Skipping debug.'); return; }
       
             const q = `
               query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo){
                   pullRequest(number:$number){
                     number
+                    url
                     state
                     isDraft
-                    mergeStateStatus
-                    reviewDecision
-                    viewerCanEnableAutoMerge
-                    viewerCanMerge
-                    requiredStatusCheckContexts
+                    mergeStateStatus        # CLEAN | BLOCKED | DRAFT | BEHIND | DIRTY | UNKNOWN | UNSTABLE
+                    reviewDecision          # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+                    autoMergeRequest {      # present if auto-merge already enabled
+                      enabledBy { login }
+                      mergeMethod
+                      commitHeadline
+                    }
+                    headRefName
+                    baseRefName
+                    commits(last: 1) {
+                      nodes {
+                        commit {
+                          oid
+                          statusCheckRollup {
+                            state           # SUCCESS | PENDING | FAILURE | ERROR
+                            contexts(first: 100) {
+                              nodes {
+                                __typename
+                                ... on CheckRun { name conclusion }          # Checks API
+                                ... on StatusContext { context state }        # Legacy status contexts
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }`;
             const d = await github.graphql(q, { owner, repo, number });
             console.log(JSON.stringify(d.repository.pullRequest, null, 2));
+      
+      # Try to enable auto-merge (squash) if allowed
+      - name: Enable auto-merge (squash) if possible
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = parseInt(`${{ steps.cpr.outputs['pull-request-number'] }}`, 10);
+      
+            // Fetch PR id & current auto-merge state
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    id
+                    url
+                    isDraft
+                    mergeStateStatus
+                    reviewDecision
+                    autoMergeRequest { enabledBy { login } }
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            const pr = d.repository.pullRequest;
+      
+            if (pr.autoMergeRequest) {
+              core.info('Auto-merge already enabled.');
+              return;
+            }
+      
+            try {
+              const m = `
+                mutation($prId:ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                    pullRequest { number autoMergeRequest { enabledBy { login } } }
+                  }
+                }`;
+              const r = await github.graphql(m, { prId: pr.id });
+              core.info('Auto-merge (squash) enabled.');
+            } catch (e) {
+              core.warning('Could not enable auto-merge: ' + e.message);
+            }
