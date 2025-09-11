@@ -45,16 +45,10 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
 <!-- SPRINTS:CURRENT END -->
-**Sprint 1 – Auto-Assign + Documentation Foundations**
-*Due: 2025-09-19*
-- Auto-Assign Improvements (CODEOWNERS, GitHub Actions, Project Workflows)
-- Documentation Foundations (README.md, SECURITY.md, LICENSE.md)
 
 ### Planned Milestones
 <!-- SPRINTS:PLANNED START -->
 <!-- SPRINTS:PLANNED END -->
-- **Sprint 2 – Advanced Workflow Automation** *(TBD)*
-- **Sprint 3 – Community & Collaboration** *(TBD)*
 
 ### Recently Closed
 <!-- SPRINTS:CLOSED START -->
