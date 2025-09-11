@@ -45,7 +45,7 @@ jobs:
       - name: Update contributors list
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}   # optional, preserved
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
           CONTRIB_SINCE_DAYS: "365"
           CONTRIB_AVATAR_SIZE: "64"
         run: node .github/scripts/updateContributors.js
@@ -119,7 +119,7 @@ jobs:
         if: github.event_name != 'pull_request'   # don't open PRs from PR events
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
           branch: chore/docs-maintenance
           title: "chore(docs): maintenance update"
           commit-message: "chore(docs): maintenance update"
