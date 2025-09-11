@@ -426,7 +426,7 @@ jobs:
         if: ${{ needs.prepare.outputs.sprint_slug != '' && env.PROJECT_SPRINT_FIELD_NAME != '' && steps.pat.outputs.has != 'true' }}
         run: echo "ORG_GRAPHQL_TOKEN not set; cannot update org Projects v2 field. Skipping."
 
-sprint_to_milestone:
+  sprint_to_milestone:
     name: Sprint → Milestone
     runs-on: ubuntu-latest
     needs: [prepare]
