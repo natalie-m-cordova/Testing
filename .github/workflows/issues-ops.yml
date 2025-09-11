@@ -12,7 +12,7 @@ on:
 
 env:
   PROJECT_BOARD_NAME: "Testing Project Board"
-  PROJECT_SPRINT_FIELD_NAME: "Sprint"
+  PROJECT_SPRINT_FIELD_NAME: "Sprints"
   DEFAULT_ASSIGNEES: "NMRCDova"
   TYPE_LABEL_MAP_JSON: >-
     {
@@ -430,7 +430,7 @@ jobs:
   sprint_to_milestone:
     name: Sprint → Milestone
     runs-on: ubuntu-latest
-    needs: [prepare, sprint_to_project_field]
+    needs: [prepare]
     if: ${{ needs.prepare.outputs.sprint_slug != '' }}
     steps:
       - name: Ensure milestone exists and assign
