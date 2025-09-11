@@ -1,0 +1,222 @@
+name: DeployOrchestrator
+
+on:
+  milestone:
+    types: [closed, opened, edited]
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * *'
+  issues:
+    types: [opened, edited, closed, deleted, reopened]
+  pull_request:
+    types: [opened, edited, reopened, synchronize, closed]
+  workflow_dispatch:
+    inputs:
+      milestone_number:
+        description: "Milestone number to export (optional)"
+        required: false
+      layout_mode:
+        description: "Wiki layout: flat or folders"
+        required: false
+        default: "flat"   # choices: flat, folders
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: write
+
+env:
+  MAX_LATEST: "3"               # wiki sidebar latest closed
+  MAX_PLANNED: "3"              # README planned sprints
+  MAX_RECENT_CLOSED: "3"        # README recently closed
+  WIKI_LAYOUT_MODE: ${{ inputs.layout_mode || 'flat' }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (code & scripts)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout Wiki repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps (Octokit etc.)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i
+          fi
+          # ensure Octokit is present for scripts that may need it
+          npm i @octokit/core @octokit/plugin-paginate-rest @octokit/plugin-rest-endpoint-methods
+
+      # --- WIKI BUILD ---
+      - name: Build wiki (flat)
+        if: ${{ (inputs.layout_mode || 'flat') == 'flat' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIKI_DIR: wiki
+          MAX_LATEST: ${{ env.MAX_LATEST }}
+          MILESTONE_NUMBER: ${{ inputs.milestone_number }}
+        run: node .github/scripts/milestone-to-wiki-flat.js
+
+      - name: Build wiki (folders)
+        if: ${{ (inputs.layout_mode || 'flat') == 'folders' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIKI_DIR: wiki
+          MAX_LATEST: ${{ env.MAX_LATEST }}
+          MILESTONE_NUMBER: ${{ inputs.milestone_number }}
+        run: node .github/scripts/milestone-to-wiki-folders.js
+
+      - name: Commit & Push wiki changes
+        run: |
+          cd wiki
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(wiki): update sprint pages, sidebar, All, and Home" || echo "No changes to commit."
+          git push || true
+
+      # --- README & DOCS MAINTENANCE ---
+      - name: Render Markdown placeholders
+        run: node .github/scripts/render-md.js
+
+      - name: Update contributors
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          CONTRIB_SINCE_DAYS: "365"
+          CONTRIB_AVATAR_SIZE: "64"
+        run: node .github/scripts/updateContributors.js
+
+      - name: Compute sprint badge from milestones
+        id: sprint
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const open = await github.rest.issues.listMilestones({
+              owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
+            });
+            let chosen = open.data[0];
+            let status = 'Planned';
+            let color = 'lightgrey';
+            if (!chosen) {
+              const closed = await github.rest.issues.listMilestones({
+                owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
+              });
+              chosen = closed.data[0] || null;
+              if (chosen) { status = 'Completed'; color = 'success'; }
+            } else {
+              const today = new Date().toISOString().slice(0,10);
+              const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
+              const closedCount = chosen.closed_issues || 0;
+              if (due && due < today) status = 'Overdue', color = 'red';
+              else if (closedCount > 0) status = 'In Progress', color = 'blue';
+            }
+            const title = chosen?.title || '';
+            const m = title.match(/sprint\s*#?\s*(\d+)/i);
+            const sprintNum = m ? m[1] : (title.replace(/^\s*sprint\s*#?\s*/i,'').split(/\s*-/)[0].trim() || 'N-A');
+            const statusLabel = String(status).replace(/\s+/g, '--');
+            const label = `Sprint-${sprintNum}--${statusLabel}`;
+            const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
+            core.setOutput('badge', badge);
+
+      - name: Update README from milestones (current/planned/closed)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          SPRINT_BADGE: ${{ steps.sprint.outputs.badge }}
+          MAX_PLANNED: ${{ env.MAX_PLANNED }}
+          MAX_RECENT_CLOSED: ${{ env.MAX_RECENT_CLOSED }}
+          EPIC_LABELS: "epic"
+        run: node .github/scripts/milestones-to-readme.js
+
+      - name: Update README Sprint Notes (Wiki)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          WIKI_LAYOUT_MODE: ${{ env.WIKI_LAYOUT_MODE }}
+        run: node .github/scripts/wiki-notes-to-readme.js
+
+      # --- SINGLE PR FOR REPO DOC CHANGES ---
+      - name: Create Pull Request with changes
+        id: cpr
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/docs-orchestrator
+          title: "chore(docs): wiki + README updates"
+          commit-message: "chore(docs): sync wiki + README (badges, milestones, wiki notes, contributors)"
+          body: |
+            Automated docs maintenance (orchestrated):
+            - Rebuilt Wiki (layout=${{ env.WIKI_LAYOUT_MODE }})
+            - Rendered README placeholders
+            - Updated contributors section
+            - Updated sprint badge + milestones sections
+            - Updated Sprint Notes (Wiki) links
+            _This PR only contains repo file changes; Wiki pages were pushed directly to the Wiki repo._
+          labels: |
+            automation
+            documentation
+          add-paths: |
+            README.md
+            CONTRIBUTING.md
+            **/*.md
+          delete-branch: true
+          signoff: false
+
+      - name: Enable auto-merge (squash) if possible
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = parseInt("${{ steps.cpr.outputs.pull-request-number }}", 10);
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    id
+                    isDraft
+                    mergeStateStatus
+                    autoMergeRequest { enabledBy { login } }
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            const pr = d.repository.pullRequest;
+            if (pr.isDraft) return;
+            if (!pr.autoMergeRequest) {
+              try {
+                const m = `mutation($id:ID!){
+                  enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:SQUASH}){
+                    pullRequest{ number }
+                  }
+                }`;
+                await github.graphql(m, { id: pr.id });
+              } catch (e) {
+                core.warning('Could not enable auto-merge: ' + e.message);
+              }
+            }
