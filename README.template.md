@@ -51,8 +51,8 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 - Documentation Foundations (README.md, SECURITY.md, LICENSE.md)
 
 ### Planned Milestones
-<!-- SPRINTS:OPEN START -->
-<!-- SPRINTS:OPEN END -->
+<!-- SPRINTS:PLANNED START -->
+<!-- SPRINTS:PLANNED END -->
 - **Sprint 2 – Advanced Workflow Automation** *(TBD)*
 - **Sprint 3 – Community & Collaboration** *(TBD)*
 
