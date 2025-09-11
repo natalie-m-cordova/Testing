@@ -111,7 +111,7 @@ jobs:
           echo "labels=${{ steps.ctx.outputs.labels_json }}"
 
   assign_and_normalize:
-    name: Assign owner & normalize labels
+    name: Assign owner & set Issue Type (keep original labels)
     runs-on: ubuntu-latest
     needs: [prepare]
     steps:
@@ -129,56 +129,102 @@ jobs:
             });
             core.info(`Assigned: ${list.join(', ')}`);
 
-      - name: Normalize type labels (replace raw with canonical)
+      - name: Map label -> Issue Type name
+        id: map
+        uses: actions/github-script@v7
+        env:
+          LABELS_JSON: ${{ needs.prepare.outputs.labels_json }}
+          TYPE_LABEL_MAP_JSON: ${{ env.TYPE_LABEL_MAP_JSON }}
+        with:
+          result-encoding: string
+          script: |
+            const labels = JSON.parse(process.env.LABELS_JSON || '[]').map(l => String(l||'').toLowerCase());
+            const map = JSON.parse(process.env.TYPE_LABEL_MAP_JSON || '{}');
+            // map example: {"bug":"type: Bug", "enhancement":"type: Enhancement", ...}
+            let typeName = '';
+            for (const [raw, canonical] of Object.entries(map)) {
+              if (labels.includes(String(raw).toLowerCase())) {
+                typeName = String(canonical).replace(/^type:\s*/i, '').trim(); // "type: Bug" -> "Bug"
+                break;
+              }
+            }
+            return typeName; // empty string if no match
+
+      - name: Note (no matching type from labels)
+        if: ${{ steps.map.outputs.result == '' }}
+        run: echo "No mapped Issue Type from labels. Skipping type update."
+
+      - name: Check PAT availability
+        id: pat
+        env:
+          PAT: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+        run: |
+          if [ -n "${PAT}" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Inspect owner type (User vs Organization)
+        id: owner
+        if: ${{ steps.map.outputs.result != '' && steps.pat.outputs.has == 'true' }}
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          result-encoding: string
           script: |
-            const map = JSON.parse(process.env.TYPE_LABEL_MAP_JSON || "{}"); // e.g. {"bug":"type: Bug", ...}
-            const labels = JSON.parse('${{ needs.prepare.outputs.labels_json }}'); // current labels (strings)
-            const lowerSet = new Set(labels.map(l => (l||'').toLowerCase()));
+            const { owner, repo } = context.repo;
+            const q = `
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) { owner { __typename } }
+              }`;
+            const d = await github.graphql(q, { owner, repo });
+            return d.repository.owner.__typename; // "Organization" or "User"
 
-            // figure out which canonical labels to add and which raw labels to remove
-            const toAdd = new Set();
-            const toRemove = new Set();
+      - name: Note (Issue Types require org + PAT)
+        if: ${{ steps.map.outputs.result != '' && (steps.pat.outputs.has != 'true' || steps.owner.outputs.result != 'Organization') }}
+        run: echo "Skipping Issue Type update (PAT missing or owner is not an Organization)."
 
-            for (const [raw, canonical] of Object.entries(map)) {
-              const rawLower = (raw||'').toLowerCase();
-              const canonicalLower = (canonical||'').toLowerCase();
+      - name: Set Issue Type (GraphQL via PAT)
+        if: ${{ steps.map.outputs.result != '' && steps.pat.outputs.has == 'true' && steps.owner.outputs.result == 'Organization' }}
+        uses: actions/github-script@v7
+        env:
+          TYPE_NAME: ${{ steps.map.outputs.result }}
+          ISSUE_NUMBER: ${{ needs.prepare.outputs.issue_number }}
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const typeName = process.env.TYPE_NAME;
+            const number = parseInt(process.env.ISSUE_NUMBER, 10);
 
-              if (lowerSet.has(rawLower)) {
-                // if canonical not already present, mark to add
-                if (!lowerSet.has(canonicalLower)) toAdd.add(canonical);
-                // always remove the raw label
-                toRemove.add(raw);
-              }
+            // Get Issue node id
+            const q1 = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  issue(number:$number) { id }
+                  owner {
+                    __typename
+                    ... on Organization {
+                      issueTypes(first:100) { nodes { id name } }
+                    }
+                  }
+                }
+              }`;
+            const d1 = await github.graphql(q1, { owner, repo, number });
+            const issueId = d1.repository.issue.id;
+
+            const org = d1.repository.owner;
+            if (!org || org.__typename !== 'Organization' || !org.issueTypes) {
+              throw new Error("Issue Types not enabled or accessible for this org (check PAT scopes + SSO).");
             }
+            const match = org.issueTypes.nodes.find(t => t.name.toLowerCase() === typeName.toLowerCase());
+            if (!match) throw new Error(`Issue Type "${typeName}" not found. Create it in org settings or adjust mapping.`);
 
-            // add canonical labels first (so we never end up with no type at all)
-            if (toAdd.size) {
-              await github.rest.issues.addLabels({
-                ...context.repo,
-                issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
-                labels: Array.from(toAdd)
-              });
-              core.info(`Added canonical type labels: ${Array.from(toAdd).join(', ')}`);
-            } else {
-              core.info('No canonical type labels to add.');
-            }
-
-            // remove raw source labels
-            for (const raw of toRemove) {
-              try {
-                await github.rest.issues.removeLabel({
-                  ...context.repo,
-                  issue_number: Number("${{ needs.prepare.outputs.issue_number }}"),
-                  name: raw
-                });
-                core.info(`Removed raw label: ${raw}`);
-              } catch (e) {
-                // ignore if already removed by race
-                core.info(`Skip removing ${raw}: ${e.message}`);
-              }
-            }
+            const mut = `
+              mutation($issueId:ID!, $issueTypeId:ID!) {
+                updateIssue(input: {id:$issueId, issueTypeId:$issueTypeId}) {
+                  issue { id number }
+                }
+              }`;
+            await github.graphql(mut, { issueId, issueTypeId: match.id });
+            core.info(`Issue #${number}: type set to "${typeName}".`);
 
   project_add:
     name: Add to Project board
