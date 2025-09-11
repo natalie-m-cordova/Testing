@@ -115,68 +115,68 @@ jobs:
           PY
 
       - name: Create Pull Request with changes
-  id: cpr
-  if: github.event_name != 'pull_request'
-  uses: peter-evans/create-pull-request@v6
-  with:
-    token: ${{ secrets.GITHUB_TOKEN }}
-    branch: chore/docs-maintenance
-    title: "chore(docs): maintenance update"
-    commit-message: "chore(docs): maintenance update"
-    body: |
-      Automated docs maintenance:
-      - Rendered README placeholders
-      - Updated contributors section
-      - Updated Sprint badge (if applicable)
-      _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
-    labels: |
-      automation
-      documentation
-    add-paths: |
-      README.md
-      CONTRIBUTING.md
-      **/*.md
-    delete-branch: true
-    signoff: false
-
-# Show what the action returned (helps confirm why debug runs/skips)
-- name: Show PR outputs (debug)
-  if: ${{ always() }}
-  run: |
-    echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
-    echo "number=${{ steps.cpr.outputs.pull-request-number }}"
-    echo "url=${{ steps.cpr.outputs.pull-request-url }}"
-
-# Debug mergeability – run always, but skip internally if no PR number
-- name: Debug mergeability
-  if: ${{ always() }}
-  uses: actions/github-script@v7
-  with:
-    # Prefer PAT if present (to reflect the real merging actor), else fallback to GITHUB_TOKEN
-    github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
-    script: |
-      const { owner, repo } = context.repo;
-      const numStr = `${{ steps.cpr.outputs['pull-request-number'] }}`; // blank if no diffs
-      const number = parseInt(numStr || '0', 10);
-      if (!number) {
-        core.info('No PR number (probably no file changes), skipping debug.');
-        return;
-      }
-
-      const q = `
-        query($owner:String!, $repo:String!, $number:Int!) {
-          repository(owner:$owner, name:$repo){
-            pullRequest(number:$number){
-              number
-              state
-              isDraft
-              mergeStateStatus
-              reviewDecision
-              viewerCanEnableAutoMerge
-              viewerCanMerge
-              requiredStatusCheckContexts
+        id: cpr
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/docs-maintenance
+          title: "chore(docs): maintenance update"
+          commit-message: "chore(docs): maintenance update"
+          body: |
+            Automated docs maintenance:
+            - Rendered README placeholders
+            - Updated contributors section
+            - Updated Sprint badge (if applicable)
+            _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
+          labels: |
+            automation
+            documentation
+          add-paths: |
+            README.md
+            CONTRIBUTING.md
+            **/*.md
+          delete-branch: true
+          signoff: false
+      
+      # Show what the action returned (helps confirm why debug runs/skips)
+      - name: Show PR outputs (debug)
+        if: ${{ always() }}
+        run: |
+          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
+          echo "number=${{ steps.cpr.outputs.pull-request-number }}"
+          echo "url=${{ steps.cpr.outputs.pull-request-url }}"
+      
+      # Debug mergeability – run always, but skip internally if no PR number
+      - name: Debug mergeability
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          # Prefer PAT if present (to reflect the real merging actor), else fallback to GITHUB_TOKEN
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const numStr = `${{ steps.cpr.outputs['pull-request-number'] }}`; // blank if no diffs
+            const number = parseInt(numStr || '0', 10);
+            if (!number) {
+              core.info('No PR number (probably no file changes), skipping debug.');
+              return;
             }
-          }
-        }`;
-      const d = await github.graphql(q, { owner, repo, number });
-      console.log(JSON.stringify(d.repository.pullRequest, null, 2));
+      
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    number
+                    state
+                    isDraft
+                    mergeStateStatus
+                    reviewDecision
+                    viewerCanEnableAutoMerge
+                    viewerCanMerge
+                    requiredStatusCheckContexts
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            console.log(JSON.stringify(d.repository.pullRequest, null, 2));
