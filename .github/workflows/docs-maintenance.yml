@@ -56,15 +56,12 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-      
             const open = await github.rest.issues.listMilestones({
               owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
             });
-      
             let chosen = open.data[0];
             let status = 'Planned';
             let color = 'lightgrey';
-      
             if (!chosen) {
               const closed = await github.rest.issues.listMilestones({
                 owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
@@ -78,16 +75,21 @@ jobs:
               if (due && due < today) status = 'Overdue', color = 'red';
               else if (closedCount > 0) status = 'In Progress', color = 'blue';
             }
-      
             const title = chosen?.title || '';
-            // Accept "Sprint 2", "Sprint#2", "sprint2", "Sprint 2 - Foo"
             const m = title.match(/sprint\s*#?\s*(\d+)/i);
             const sprintNum = m ? m[1] : (title.replace(/^\s*sprint\s*#?\s*/i,'').split(/\s*-/)[0].trim() || 'N-A');
-      
             const statusLabel = String(status).replace(/\s+/g, '--');
             const label = `Sprint-${sprintNum}--${statusLabel}`;
             const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
             core.setOutput('badge', badge);
+
+      - name: Update README from milestones
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }} # optional reuse
+          SPRINT_BADGE: ${{ steps.sprint.outputs.badge }}
+          MAX_RECENT_CLOSED: "5"
+        run: node .github/scripts/milestones-to-readme.js
       
       - name: Create Pull Request with changes
         id: cpr
