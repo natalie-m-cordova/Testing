@@ -110,7 +110,7 @@ jobs:
           echo "sprint_label=${{ steps.ctx.outputs.sprint_label }}"
           echo "labels=${{ steps.ctx.outputs.labels_json }}"
 
-assign_and_normalize:
+  assign_and_normalize:
     name: Assign owner & set Issue Type (keep original labels)
     runs-on: ubuntu-latest
     needs: [prepare]
