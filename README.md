@@ -46,7 +46,7 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
-**Sprint 2 - Portfolio Scaffold + Skills Data Pipeline (read-only)** *Due: 2025-10-03*
+**Sprint 2 - Portfolio Scaffold + Skills Data Pipeline** *Due: 2025-10-03*
 - [Skills Graph (Notion export + basic D3)](https://github.com/natalie-m-cordova/Testing/issues/43)
 - [Portfolio Site MVP (GITHub Pages + Projects Feed)](https://github.com/natalie-m-cordova/Testing/issues/42)
 <!-- SPRINTS:CURRENT END -->
@@ -75,7 +75,7 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 ## Contributors
 <!-- CONTRIBUTORS:START -->
 <p align="center">
-  <a href="https://github.com/NMRCDova" title="NMRCDova • 321 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 322 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
 </p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
@@ -84,10 +84,8 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 This repository is maintained as a practice ground for GitHub usage and open-source best practices.
 
 ## Sprint Notes (Wiki)
-
-- **Latest Review:** [Sprint 1 Review](../../wiki/Sprints/Sprint-1-Review)
-- **Latest Retro:** [Sprint 1 Retrospective](../../wiki/Sprints/Sprint-1-Retrospective)
-- **How We Work:** [Practices](../../wiki/Practices/How-We-Work)
+<!-- WIKI:NOTES START -->
+<!-- WIKI:NOTES END -->
 
 ## Acknowledgments
 This project uses the [git-auto-commit-action](https://github.com/stefanzweifel/git-auto-commit-action) by @stefanzweifel for automating README updates.
