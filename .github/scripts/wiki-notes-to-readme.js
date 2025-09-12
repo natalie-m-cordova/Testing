@@ -57,7 +57,7 @@ function replaceBetweenMarkers(src, startTag, endTag, html) {
     // Paths differ by layout
     const reviewPath = (LAYOUT === "folders")
       ? `../../wiki/Sprints/${baseHy}/Review`
-      : `../../wiki/${baseHy}-Review`;
+      : `../../wiki/${baseHy}---Review`;
 
     const retroPath = (LAYOUT === "folders")
       ? `../../wiki/Sprints/${baseHy}/Retro`
