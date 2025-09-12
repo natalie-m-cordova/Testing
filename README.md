@@ -8,7 +8,7 @@
   <img alt="Issues" src="https://img.shields.io/github/issues/natalie-m-cordova/Testing">
   <img alt="Contributors" src="https://img.shields.io/github/contributors/natalie-m-cordova/Testing">
   <!-- SPRINT BADGE START -->
-
+<img alt="Sprint" src="https://img.shields.io/badge/Sprint-2--In--Progress-blue">
 <!-- SPRINT BADGE END -->
   <img alt="Sandbox" src="https://img.shields.io/badge/Repo-Sandbox-purple">
   <img alt="Wiki" src="https://img.shields.io/badge/wiki-available-pink">
@@ -46,11 +46,18 @@ We organize work using Agile-style sprint milestones and EPIC issues.
 
 ### Current Milestone
 <!-- SPRINTS:CURRENT START -->
+**Sprint 2 - Portfolio Scaffold + Skills Data Pipeline** *Due: 2025-10-03*
+- [Skills Graph (Notion export + basic D3)](https://github.com/natalie-m-cordova/Testing/issues/43)
+- [Portfolio Site MVP (GITHub Pages + Projects Feed)](https://github.com/natalie-m-cordova/Testing/issues/42)
 <!-- SPRINTS:CURRENT END -->
 
 ### Planned Milestones
 <!-- SPRINTS:PLANNED START -->
-
+| Sprint | Due | Link |
+|---|---|---|
+| Sprint 3 | 2025-10-17 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/3) |
+| Sprint 4 | 2025-10-31 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/4) |
+| Sprint 5 | 2025-11-14 | [Milestone](https://github.com/natalie-m-cordova/Testing/milestone/5) |
 <!-- SPRINTS:PLANNED END -->
 
 ### Recently Closed
@@ -67,7 +74,9 @@ Contributions are welcome! Please see the [Contributing Guidelines](CONTRIBUTING
 
 ## Contributors
 <!-- CONTRIBUTORS:START -->
-
+<p align="center">
+  <a href="https://github.com/NMRCDova" title="NMRCDova • 325 contributions (12 mo)"><img src="https://avatars.githubusercontent.com/u/165925611?v=4&s=64" width="64px" alt="NMRCDova" /></a>
+</p>
 <!-- CONTRIBUTORS:END -->
 <!-- PREV-BLOCK:START -->
 <!-- PREV-BLOCK:END -->
@@ -76,6 +85,9 @@ This repository is maintained as a practice ground for GitHub usage and open-sou
 
 ## Sprint Notes (Wiki)
 <!-- WIKI:NOTES START -->
+- **Latest Review:** [Sprint 1 Review](../../wiki/Sprint-1-Review)
+- **Latest Retro:** [Sprint 1 Retrospective](../../wiki/Sprint-1-Retro)
+- **How We Work:** [Practices](../../wiki/Practices-How-we-work)
 <!-- WIKI:NOTES END -->
 
 ## Acknowledgments
