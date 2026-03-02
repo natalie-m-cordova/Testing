@@ -50,23 +50,18 @@ jobs:
           CONTRIB_AVATAR_SIZE: "64"
         run: node .github/scripts/updateContributors.js
 
-      # --- Update Sprint Badge (from update-sprint-badge) ---
       - name: Compute sprint badge from milestones
         id: sprint
         uses: actions/github-script@v7
         with:
           script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
+            const { owner, repo } = context.repo;
             const open = await github.rest.issues.listMilestones({
               owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
             });
-
             let chosen = open.data[0];
             let status = 'Planned';
             let color = 'lightgrey';
-
             if (!chosen) {
               const closed = await github.rest.issues.listMilestones({
                 owner, repo, state: 'closed', sort: 'due_on', direction: 'desc'
@@ -77,46 +72,30 @@ jobs:
               const today = new Date().toISOString().slice(0,10);
               const due = chosen.due_on ? chosen.due_on.slice(0,10) : null;
               const closedCount = chosen.closed_issues || 0;
-              if (due && due < today) { status = 'Overdue'; color = 'red'; }
-              else if (closedCount > 0) { status = 'In Progress'; color = 'blue'; }
+              if (due && due < today) status = 'Overdue', color = 'red';
+              else if (closedCount > 0) status = 'In Progress', color = 'blue';
             }
-
-            function hyphenate(s){ return String(s || '').trim().replace(/\s+/g, '-'); }
-            const m = chosen && chosen.title ? chosen.title.match(/Sprint\s+(\d+)/i) : null;
-            const sprintNum = m ? m[1] : (chosen ? chosen.title : 'N-A');
+            const title = chosen?.title || '';
+            const m = title.match(/sprint\s*#?\s*(\d+)/i);
+            const sprintNum = m ? m[1] : (title.replace(/^\s*sprint\s*#?\s*/i,'').split(/\s*-/)[0].trim() || 'N-A');
             const statusLabel = String(status).replace(/\s+/g, '--');
-            const label = `Sprint-${hyphenate(sprintNum)}--${statusLabel}`;
-
+            const label = `Sprint-${sprintNum}--${statusLabel}`;
             const badge = `<img alt="Sprint" src="https://img.shields.io/badge/${encodeURIComponent(label)}-${color}">`;
             core.setOutput('badge', badge);
 
-      - name: Update README badge between markers
-        if: ${{ steps.sprint.outputs.badge != '' }}
+      - name: Update README from milestones
         env:
-          BADGE: ${{ steps.sprint.outputs.badge }}
-        run: |
-          python - <<'PY'
-          import os, re, sys
-          fn = "README.md"
-          with open(fn, "r", encoding="utf-8") as f:
-              txt = f.read()
-          badge = os.environ.get("BADGE", "").strip()
-          if not badge:
-              print("No BADGE provided; skipping."); sys.exit(0)
-          pat = r"<!--\s*SPRINT BADGE START\s*-->.*?<!--\s*SPRINT BADGE END\s*-->"
-          repl = f"<!-- SPRINT BADGE START -->{badge}<!-- SPRINT BADGE END -->"
-          new = re.sub(pat, repl, txt, flags=re.S)
-          if new != txt:
-              with open(fn, "w", encoding="utf-8") as f:
-                  f.write(new)
-              print("README updated.")
-          else:
-              print("No change to README.md")
-          PY
-
-      # --- Create or update a PR with any changes ---
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRAPHQL_TOKEN: ${{ secrets.ORG_GRAPHQL_TOKEN }}
+          SPRINT_BADGE: ${{ steps.sprint.outputs.badge }}
+          MAX_PLANNED: "3"
+          MAX_RECENT_CLOSED: "3"
+          EPIC_LABELS: "epic"   # comma-separated if you use multiple labels
+        run: node .github/scripts/milestones-to-readme.js
+        
       - name: Create Pull Request with changes
-        if: github.event_name != 'pull_request'   # don't open PRs from PR events
+        id: cpr
+        if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.ORG_GRAPHQL_TOKEN }}
@@ -128,7 +107,6 @@ jobs:
             - Rendered README placeholders
             - Updated contributors section
             - Updated Sprint badge (if applicable)
-
             _This PR is opened/updated automatically. It will only contain changes if there were file diffs._
           labels: |
             automation
@@ -139,3 +117,187 @@ jobs:
             **/*.md
           delete-branch: true
           signoff: false
+      
+      # Merge now if CLEAN, otherwise enable auto-merge (squash)
+      - name: Merge or enable auto-merge
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = parseInt("${{ steps.cpr.outputs.pull-request-number }}", 10);
+      
+            // Get PR state + node id
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!){
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    id
+                    number
+                    state
+                    isDraft
+                    mergeStateStatus     # CLEAN | BLOCKED | DRAFT | BEHIND | DIRTY | UNKNOWN | UNSTABLE
+                    reviewDecision       # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+                    autoMergeRequest { enabledBy { login } }
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            const pr = d.repository.pullRequest;
+            core.info(`PR #${pr.number}: state=${pr.state} draft=${pr.isDraft} mergeState=${pr.mergeStateStatus}`);
+      
+            if (pr.state !== 'OPEN' || pr.isDraft) {
+              core.info('Not merging (closed or draft).');
+              return;
+            }
+      
+            // If it's already clean, try to merge immediately (squash). If that fails, fall back to enabling auto-merge.
+            if (pr.mergeStateStatus === 'CLEAN') {
+              try {
+                const m = `
+                  mutation($id:ID!){
+                    mergePullRequest(input:{pullRequestId:$id, mergeMethod:SQUASH}){
+                      pullRequest{ number merged }
+                    }
+                  }`;
+                await github.graphql(m, { id: pr.id });
+                core.info('Merged via GraphQL (SQUASH).');
+                return;
+              } catch (e) {
+                core.warning('GraphQL merge failed: ' + e.message);
+                try {
+                  await github.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
+                    owner, repo, pull_number: number, merge_method: 'squash'
+                  });
+                  core.info('Merged via REST (SQUASH).');
+                  return;
+                } catch (e2) {
+                  core.warning('REST merge failed: ' + e2.message);
+                }
+              }
+            }
+      
+            // Not clean → try to enable auto-merge so it completes when protections are satisfied
+            if (!pr.autoMergeRequest) {
+              try {
+                const m = `
+                  mutation($id:ID!){
+                    enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:SQUASH}){
+                      pullRequest{ number }
+                    }
+                  }`;
+                await github.graphql(m, { id: pr.id });
+                core.info('Enabled auto-merge (SQUASH).');
+              } catch (e) {
+                core.warning('Could not enable auto-merge: ' + e.message);
+              }
+            } else {
+              core.info('Auto-merge already enabled.');
+            }
+      
+      # (optional) print outputs so you can see why debug runs/skips
+      - name: Show PR outputs (debug)
+        if: ${{ always() }}
+        run: |
+          echo "operation=${{ steps.cpr.outputs.pull-request-operation }}"
+          echo "number=${{ steps.cpr.outputs.pull-request-number }}"
+          echo "url=${{ steps.cpr.outputs.pull-request-url }}"
+      
+      # Debug mergeability (schema-safe)
+      - name: Debug mergeability
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          # prefer PAT if you want to reflect your real “merging actor”; else fallback to GITHUB_TOKEN
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const numStr = `${{ steps.cpr.outputs['pull-request-number'] }}`;
+            const number = parseInt(numStr || '0', 10);
+            if (!number) { core.info('No PR number (likely no diffs). Skipping debug.'); return; }
+      
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    number
+                    url
+                    state
+                    isDraft
+                    mergeStateStatus        # CLEAN | BLOCKED | DRAFT | BEHIND | DIRTY | UNKNOWN | UNSTABLE
+                    reviewDecision          # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+                    autoMergeRequest {      # present if auto-merge already enabled
+                      enabledBy { login }
+                      mergeMethod
+                      commitHeadline
+                    }
+                    headRefName
+                    baseRefName
+                    commits(last: 1) {
+                      nodes {
+                        commit {
+                          oid
+                          statusCheckRollup {
+                            state           # SUCCESS | PENDING | FAILURE | ERROR
+                            contexts(first: 100) {
+                              nodes {
+                                __typename
+                                ... on CheckRun { name conclusion }          # Checks API
+                                ... on StatusContext { context state }        # Legacy status contexts
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            console.log(JSON.stringify(d.repository.pullRequest, null, 2));
+      
+      # Try to enable auto-merge (squash) if allowed
+      - name: Enable auto-merge (squash) if possible
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_GRAPHQL_TOKEN != '' && secrets.ORG_GRAPHQL_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = parseInt(`${{ steps.cpr.outputs['pull-request-number'] }}`, 10);
+      
+            // Fetch PR id & current auto-merge state
+            const q = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo){
+                  pullRequest(number:$number){
+                    id
+                    url
+                    isDraft
+                    mergeStateStatus
+                    reviewDecision
+                    autoMergeRequest { enabledBy { login } }
+                  }
+                }
+              }`;
+            const d = await github.graphql(q, { owner, repo, number });
+            const pr = d.repository.pullRequest;
+      
+            if (pr.autoMergeRequest) {
+              core.info('Auto-merge already enabled.');
+              return;
+            }
+      
+            try {
+              const m = `
+                mutation($prId:ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                    pullRequest { number autoMergeRequest { enabledBy { login } } }
+                  }
+                }`;
+              const r = await github.graphql(m, { prId: pr.id });
+              core.info('Auto-merge (squash) enabled.');
+            } catch (e) {
+              core.warning('Could not enable auto-merge: ' + e.message);
+            }

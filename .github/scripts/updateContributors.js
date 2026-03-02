@@ -72,51 +72,69 @@ function replaceSection(filePath, startTag, endTag, replacement) {
     console.log(`ℹ️ Skipping missing file: ${filePath}`);
     return false;
   }
-  const src = fs.readFileSync(filePath, 'utf8');
-  const re = new RegExp(`<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`, 'm');
+  const src = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(`<!--\\s*${startTag}\\s*-->[\\s\\S]*?<!--\\s*${endTag}\\s*-->`, "m");
   if (!re.test(src)) {
     console.warn(`⚠️ Markers not found in ${filePath}: ${startTag} / ${endTag}`);
     return false;
   }
-  const block = `<!-- ${startTag} -->\n${(replacement || '').trim()}\n<!-- ${endTag} -->`;
+  const block = `<!-- ${startTag} -->\n${(replacement || "").trim()}\n<!-- ${endTag} -->`;
   const out = src.replace(re, block);
   if (out === src) {
     console.log(`ℹ️ ${filePath} section ${startTag} unchanged (content identical)`);
     return false;
   }
-  fs.writeFileSync(filePath, out, 'utf8');
+  fs.writeFileSync(filePath, out, "utf8");
   console.log(`✅ Updated ${filePath} section ${startTag}..${endTag}`);
   return true;
 }
 
-// Replace or remove an entire wrapper block (e.g., PREV-BLOCK)
+// Replace (never delete) the wrapper block (e.g., PREV-BLOCK).
+// If newContentOrEmpty is empty -> keep only the wrapper lines with nothing inside.
+// If non-empty -> inject exactly that content inside the wrapper.
+// If the wrapper is missing, insert it (empty) immediately after <!-- CONTRIBUTORS:END --> if present; else append at EOF.
 function replaceWholeBlock(filePath, wrapperStart, wrapperEnd, newContentOrEmpty) {
   if (!fs.existsSync(filePath)) {
     console.log(`ℹ️ Skipping missing file: ${filePath}`);
     return false;
   }
-  const src = fs.readFileSync(filePath, "utf8");
-  const re = new RegExp(
+
+  let src = fs.readFileSync(filePath, "utf8");
+  const wrapperRe = new RegExp(
     `<!--\\s*${wrapperStart}\\s*-->[\\s\\S]*?<!--\\s*${wrapperEnd}\\s*-->`,
     "m"
   );
-  if (!re.test(src)) {
-    // Wrapper missing: nothing to do (stay graceful).
-    console.warn(`⚠️ Wrapper not found in ${filePath}: ${wrapperStart} / ${wrapperEnd}`);
+
+  // Ensure wrapper exists
+  if (!wrapperRe.test(src)) {
+    const emptyWrapper = `<!-- ${wrapperStart} -->\n<!-- ${wrapperEnd} -->`;
+    const afterContribEndRe = /<!--\s*CONTRIBUTORS:END\s*-->/m;
+    if (afterContribEndRe.test(src)) {
+      src = src.replace(afterContribEndRe, (m) => `${m}\n\n${emptyWrapper}`);
+    } else {
+      if (!/\n$/.test(src)) src += "\n";
+      src += `\n${emptyWrapper}\n`;
+    }
+  }
+
+  // Compute inner content
+  const inner = (newContentOrEmpty && newContentOrEmpty.trim().length)
+    ? `\n${newContentOrEmpty.trim()}\n`
+    : `\n`; // empty interior (just newline so START and END are on separate lines)
+
+  const out = src.replace(
+    wrapperRe,
+    `<!-- ${wrapperStart} -->${inner}<!-- ${wrapperEnd} -->`
+  );
+
+  if (out !== src) {
+    fs.writeFileSync(filePath, out, "utf8");
+    console.log(`✅ Updated wrapper ${wrapperStart}..${wrapperEnd} in ${filePath}`);
+    return true;
+  } else {
+    console.log(`ℹ️ Wrapper ${wrapperStart}..${wrapperEnd} unchanged in ${filePath}`);
     return false;
   }
-  const out =
-    newContentOrEmpty.trim().length > 0
-      ? src.replace(
-          re,
-          `<!-- ${wrapperStart} -->\n${newContentOrEmpty}\n<!-- ${wrapperEnd} -->`
-        )
-      : src.replace(re, ""); // remove the whole block if empty
-  fs.writeFileSync(filePath, out, "utf8");
-  console.log(
-    `✅ ${newContentOrEmpty.trim().length ? "Updated" : "Removed"} wrapper ${wrapperStart}..${wrapperEnd} in ${filePath}`
-  );
-  return true;
 }
 
 // ----- Data fetch -----
@@ -233,12 +251,12 @@ async function countIssuesPRs(login, sinceISO) {
     // Build a full "Previous Contributors" block (header + inner markers) if non-empty
     const prevBlock = previous.length
       ? [
-          "## Previous Contributors",
+          "<h1>Previous Contributors</h1>",
           "<!-- PREVIOUS-CONTRIBUTORS:START -->",
           previousHTML,
           "<!-- PREVIOUS-CONTRIBUTORS:END -->",
         ].join("\n")
-      : ""; // empty => wrapper will be removed entirely
+      : ""; // empty => wrapper stays but with no inner content
 
     const changed = [];
 
@@ -246,22 +264,17 @@ async function countIssuesPRs(login, sinceISO) {
     if (replaceSection("README.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML))
       changed.push("README.md active");
 
-    // Update or remove entire previous block via wrapper
+    // Update wrapper (keep even if empty)
     replaceWholeBlock("README.md", "PREV-BLOCK:START", "PREV-BLOCK:END", prevBlock);
 
     // CONTRIBUTING
     if (replaceSection("CONTRIBUTING.md", "CONTRIBUTORS:START", "CONTRIBUTORS:END", activeHTML))
       changed.push("CONTRIBUTING.md active");
 
-    replaceWholeBlock(
-      "CONTRIBUTING.md",
-      "PREV-BLOCK:START",
-      "PREV-BLOCK:END",
-      prevBlock
-    );
+    replaceWholeBlock("CONTRIBUTING.md", "PREV-BLOCK:START", "PREV-BLOCK:END", prevBlock);
 
     if (changed.length === 0) {
-      console.log("ℹ️ Sections updated (or removed) as needed. Ensure markers exist in both files.");
+      console.log("ℹ️ Sections updated (or left unchanged). Ensure markers exist in both files.");
     } else {
       console.log("✅ Updated:", changed.join(", "));
     }
